@@ -6,7 +6,7 @@ import tempfile
 import time
 from . import media,native,subtitles
 from .common import digest,fingerprint,install,run
-from .providers import identity
+from .providers import identity,DownloadBudgetReached
 
 def verify(video,candidate,info,config,state):
     cues=subtitles.read(candidate)
@@ -68,11 +68,19 @@ def process(video,args,config,state,provider):
     if args.audio_stream is not None:
         if not any(s.get('codec_type')=='audio' and s['index']==args.audio_stream for s in info['data']['streams']):raise ValueError('Requested audio stream is not present')
         info['audio_index']=args.audio_stream
+    if info['audio_index'] is None and config.get('assume_single_untagged_english'):
+        info['audio_index']=media.single_untagged_audio(info['data'])
+        if info['audio_index'] is not None:
+            record['audio_assumption']='Single untagged audio treated as English by user option; file unchanged'
+            print('    '+record['audio_assumption'],flush=True)
     if info['text']:return dict(record,status='TRUSTED_EMBEDDED',detail='Full non-forced English text; not dialogue verified')
     if args.scan_only:
         return dict(record,status='NEEDS_OCR' if info['bitmap'] else 'NEEDS_SIDECAR_CHECK' if sidecars else 'NEEDS_DOWNLOAD',unknown_sidecars=[str(p) for p in unknown])
     if info['bitmap']:return dict(record,**ocr(video,info,config,state,args.apply))
-    if info['audio_index'] is None:return dict(record,status='REVIEW_AUDIO_LANGUAGE',detail='No unambiguous English dialogue track')
+    if info['audio_index'] is None:
+        reason=('Single audio track has no language tag; use --assume-single-untagged-english if appropriate'
+                if media.single_untagged_audio(info['data']) is not None else 'No unambiguous English dialogue track (missing, multiple, or non-English tracks)')
+        return dict(record,status='REVIEW_AUDIO_LANGUAGE',detail=reason)
     folder=state/'staging'/__import__('hashlib').sha256(str(video).encode()).hexdigest()[:20]
     folder.mkdir(parents=True,exist_ok=True)
     originals={str(p):digest(p) for p in sidecars}
@@ -105,16 +113,26 @@ def process(video,args,config,state,provider):
     if target.suffix.lower()!='.srt':return dict(record,status='REVIEW_FORMAT')
     expected=originals.get(str(target))
     if target.exists() and expected is None:raise ValueError('Unexpected destination sidecar')
+    deferred=False
     for entry in candidates[:config.get('max_candidates',3)]:
-        print('    Provider candidate: '+entry['release'],flush=True)
         try:
-            source=provider.download(entry);candidate,check=prepare(video,source,info,config,state,folder)
+            source=provider.download(entry)
+            print('    Checking provider candidate: '+entry['release'],flush=True)
+            candidate,check=prepare(video,source,info,config,state,folder)
             record['attempts'].append(dict(provider=entry,check=check))
             if not candidate:continue
-            record.update(candidate=str(candidate),candidate_sha256=digest(candidate))
+            # Keep the winning provider identity explicit: candidate may point to
+            # a locally shifted file whose filename no longer identifies its source.
+            record.update(candidate=str(candidate),candidate_sha256=digest(candidate),
+                          selected_provider=dict(entry,provider='OpenSubtitles'),
+                          selected_offset_seconds=check['offset'],destination=str(target))
             if args.apply:
                 receipt=install(candidate,target,state/'backups',expected,video,fp)
                 return dict(record,status='DOWNLOADED_VERIFIED',receipt=receipt,subtitle=str(target),installed_sha256=digest(target))
             return dict(record,status='WOULD_INSTALL')
+        except DownloadBudgetReached as e:
+            deferred=True
+            record['attempts'].append(dict(provider=entry,deferred='download_budget',error=str(e)))
         except Exception as e:record['attempts'].append(dict(provider=entry,error=str(e)))
+    if deferred:return dict(record,status='DEFERRED_DOWNLOAD_BUDGET',detail='Local download cap reached; some candidates not tested. Resume later or increase --max-downloads')
     return dict(record,status='UNRESOLVED',detail='No tested candidate passed; originals unchanged')

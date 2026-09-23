@@ -11,6 +11,13 @@ limits; `providers.py` and `bazarr_bridge.py` isolate provider access;
 audits and sidecar quarantine without speech recognition or provider calls.
 `bitmap_ocr.py` is a retained legacy engine, called on a copy by the workflow.
 
+`audio_tags.py` owns explicit single-untagged-audio MKV tagging, copy verification
+and original backup. The opt-in runtime assumption lives in media/workflow and
+must not override a known non-English language or ambiguous multiple tracks.
+Neither path is automatic spoken-language detection. `DownloadBudgetReached`
+is a typed local deferral; keep it separate from failed verification/provider
+errors, and continue checking cached candidates even when the cap is exhausted.
+
 Do not conflate metadata trust, container verification and dialogue verification.
 None proves 100% correctness. Do not loosen verification to make failures pass.
 Keep forced-only tracks distinct from full dialogue. Unknown language needs

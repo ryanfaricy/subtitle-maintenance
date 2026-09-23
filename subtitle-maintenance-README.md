@@ -7,6 +7,31 @@ no speech recognition or provider downloads.
 
 ## Commands
 
+### Missing audio language and download limits
+
+`--assume-single-untagged-english` allows normal verification to use exactly one
+audio stream whose language is absent or `und`, with no commentary/description
+title. It does not edit the video or detect the spoken language. Multiple audio
+streams and explicit other languages still require review. Only enable it on
+material you know is English.
+
+`--max-downloads 50` overrides the local per-run cap (default 20). Cached subtitle
+downloads do not count. Zero permits cached candidates only. Provider quota and
+rate-limit cooldowns still apply independently. `DEFERRED_DOWNLOAD_BUDGET` means
+some candidates were not tested, not that their dialogue verification failed.
+
+`--tag-missing-audio-english` is a separate metadata-only mode for MKV, not subtitle
+repair. It previews by default; `--apply` changes a verified copy with mkvpropedit,
+retains a full original backup/receipt, installs it and preserves timestamps.
+Use `--restore` with that receipt for rollback. Non-MKV files remain untouched:
+the assumption option works for their verification without container conversion.
+Media watchers can still notice metadata edits despite retained timestamps.
+
+```sh
+~/scripts/subtitle-maintain.py "/Volumes/Media/Plex/TV/QI" --limit 50 --assume-single-untagged-english --max-downloads 50
+~/scripts/subtitle-maintain.py "/path/to/video.mkv" --tag-missing-audio-english
+```
+
 Metadata-only audits and optional cleanup (no downloads or transcription):
 
 ```sh
@@ -33,6 +58,11 @@ See `subtitle-maintenance-MAINTAINING.md` for provenance, exceptions and recover
 ```
 
 Pass one or more files/folders; folders recurse. Progress prints immediately per
+file. `WOULD_INSTALL` and `DOWNLOADED_VERIFIED` include the selected OpenSubtitles
+release, provider file ID, source link, timing shift and destination. These are
+also recorded as `selected_provider`, `selected_offset_seconds` and `destination`
+in the JSON report. Positive shifts move subtitle cues later; zero is unchanged.
+Progress also prints per
 file and phase. Re-running resumes via the state database, cached transcripts,
 and provider downloads. `--rescan` rechecks previously verified files. A provider
 failure opens a cooldown but does not erase progress. The default run budget is

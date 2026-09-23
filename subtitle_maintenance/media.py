@@ -10,7 +10,7 @@ BITMAP={'dvd_subtitle','hdmv_pgs_subtitle','dvb_subtitle','xsub'}
 SIDECAR={'.srt','.ass','.ssa','.vtt'}
 
 def english(value):
-    value=str(value).lower().replace('_','-')
+    value=str(value).strip().lower().replace('_','-')
     return value in {'en','eng','english'} or value.startswith('en-')
 
 def forced(stream):
@@ -22,6 +22,19 @@ def english_stream(stream):
 
 def probe(path):
     return json.loads(run(['ffprobe','-v','error','-show_streams','-show_format','-of','json',path]))
+
+def single_untagged_audio(data):
+    """User opt-in only: one audio stream, absent/und language, no commentary hint.
+
+    This is an assumption, NOT speech-language detection. Multiple tracks and
+    explicit non-English languages must never be silently relabelled.
+    """
+    tracks=[s for s in data.get('streams',[]) if s.get('codec_type')=='audio']
+    if len(tracks)!=1:return None
+    s=tracks[0];tags=s.get('tags',{})
+    if str(tags.get('language','')).strip().lower() not in {'','und'}:return None
+    if re.search(r'commentary|description',tags.get('title',''),re.I):return None
+    return s['index']
 
 def inventory(video):
     data=probe(video);streams=data.get('streams',[])

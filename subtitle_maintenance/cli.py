@@ -12,6 +12,17 @@ from .common import atomic_json,digest,fingerprint,install
 from .providers import Provider
 from .workflow import process
 
+def selection_lines(data):
+    """Display the verified winner, not merely the last searched candidate."""
+    selected=data.get('selected_provider')
+    if not selected:return []
+    offset=data.get('selected_offset_seconds',0)
+    lines=[f"Selected: {selected['provider']} — {selected.get('release') or '(unnamed release)'} (file ID {selected['file_id']})"]
+    if selected.get('url'):lines.append('Source: '+selected['url'])
+    lines.append('Timing: '+(f'{offset:+.3f}s shift (positive = later)' if offset else 'unchanged'))
+    lines.append('Destination: '+data['destination'])
+    return lines
+
 def main():
     p=argparse.ArgumentParser(description='Conservative English subtitle maintenance. Preview by default.')
     p.add_argument('paths',nargs='*',type=Path)
@@ -27,12 +38,16 @@ def main():
     p.add_argument('--limit',type=int,default=0)
     p.add_argument('--rescan',action='store_true')
     p.add_argument('--audio-stream',type=int,help='Explicit ffprobe audio stream index; one video only')
+    p.add_argument('--assume-single-untagged-english',action='store_true',help='Treat one untagged audio stream as English without modifying the video')
+    p.add_argument('--tag-missing-audio-english',action='store_true',help='Separate MKV metadata-only mode; single untagged audio only; preview unless --apply')
+    p.add_argument('--max-downloads',type=int,help='Maximum new provider downloads this run (default config: 20); cached files do not count')
     p.add_argument('--imdb',help='Explicit tt... movie or series ID; one video only')
     p.add_argument('--season',type=int)
     p.add_argument('--episode',type=int)
     p.add_argument('--restore',type=Path,help='Restore a committed receipt, preview unless --apply')
     a=p.parse_args()
-    modes=[a.audit is not None,a.cleanup_sidecars,a.restore_quarantine is not None,a.restore is not None,a.scan_only]
+    if a.max_downloads is not None and a.max_downloads<0:p.error('--max-downloads must be zero or greater')
+    modes=[a.audit is not None,a.cleanup_sidecars,a.restore_quarantine is not None,a.restore is not None,a.scan_only,a.tag_missing_audio_english]
     if sum(modes)>1:p.error('Choose only one audit, cleanup, restore, or scan mode')
     if a.audit and a.apply:p.error('--audit is read-only')
     if a.restore_quarantine and a.paths:p.error('--restore-quarantine cannot be combined with paths')
@@ -41,6 +56,8 @@ def main():
     config=json.loads(a.config.expanduser().read_text()) if a.config.expanduser().exists() else {}
     config.setdefault('python',sys.executable);config.setdefault('model','')
     config['cache_only']=a.cache_only
+    config['assume_single_untagged_english']=a.assume_single_untagged_english
+    if a.max_downloads is not None:config['max_downloads']=a.max_downloads
     a.state_dir=a.state_dir.expanduser().resolve();a.state_dir.mkdir(parents=True,exist_ok=True)
     a.identity=None
     if a.imdb:
@@ -81,7 +98,10 @@ def main():
                     old=db.execute('select result from results where video=? and signature=?',(str(video),signature)).fetchone()
                     data=json.loads(old[0]) if old else None
                     terminal={'TRUSTED_EMBEDDED','VERIFIED','HUMAN_APPROVED'}
-                    if a.audit or a.cleanup_sidecars:
+                    if a.tag_missing_audio_english:
+                        from .audio_tags import tag_missing
+                        data=tag_missing(video,a.apply,a.state_dir,config)
+                    elif a.audit or a.cleanup_sidecars:
                         from .housekeeping import inspect
                         data=inspect(video,a.audit or 'cleanup',a.apply,a.state_dir,config)
                     elif data and data['status'] in terminal and not a.rescan:
@@ -90,6 +110,8 @@ def main():
                 except Exception as e:data=dict(video=str(video),status='ERROR',error=str(e));signature=''
                 counts[data['status']]+=1;report.append(data)
                 print('  '+data['status']+(': '+data.get('error','') if data.get('error') else ''),flush=True)
+                if data.get('detail'):print('    '+data['detail'],flush=True)
+                for line in selection_lines(data):print('    '+line,flush=True)
                 for item in data.get('cleanup_candidates',[]):print('    '+item,flush=True)
                 db.execute('insert or replace into results values (?,?,?,?)',(str(video),signature,json.dumps(data),time.time()));db.commit()
                 atomic_json(a.state_dir/'latest-report.json',dict(version=__version__,counts=dict(counts),results=report))

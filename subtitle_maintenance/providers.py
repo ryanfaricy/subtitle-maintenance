@@ -11,6 +11,9 @@ import time
 import xml.etree.ElementTree as ET
 from .common import atomic_json
 
+class DownloadBudgetReached(RuntimeError):
+    """Local per-run safety cap, not an OpenSubtitles rate-limit response."""
+
 def identity(video,config,explicit=None):
     if explicit:return explicit
     database=config.get('bazarr_database')
@@ -97,7 +100,7 @@ class Provider:
     def download(self,candidate):
         target=self.state/'downloads'/(str(candidate['file_id'])+'.srt')
         if target.exists():return target
-        if self.downloads>=self.config.get('max_downloads',20):raise RuntimeError('Per-run download budget reached; resume later')
+        if self.downloads>=self.config.get('max_downloads',20):raise DownloadBudgetReached('Local per-run download budget reached; cached candidates remain usable')
         data=self.request(dict(action='download',file_id=candidate['file_id']));self.downloads+=1
         content=base64.b64decode(data['content'],validate=True)
         if not content or len(content)>2000000 or b'-->' not in content:raise ValueError('Invalid downloaded SRT')
