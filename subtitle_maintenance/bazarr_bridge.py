@@ -25,6 +25,30 @@ def diagnostic_headers(headers):
             ('retry-after','ratelimit-reset','ratelimit-limit','ratelimit-remaining',
              'content-type','server','date') or k.lower().startswith('x-ratelimit-')}
 
+def authenticated_download(call,headers,config,file_id):
+    """Refresh this helper's private token once on a rejected download request.
+
+    Never retry quota/429/server errors or signed-content failures here. No token
+    is written to Bazarr or disk; login requests must not carry a stale bearer.
+    """
+    global TOKEN,HOST
+    for attempt in range(2):
+        if TOKEN is None:
+            headers.pop('Authorization',None)
+            login=call('api.opensubtitles.com','login',dict(username=config['username'],password=config['password']))
+            TOKEN=login['token']
+            HOST=login.get('base_url','api.opensubtitles.com')
+        headers['Authorization']='Bearer '+TOKEN
+        try:
+            return call(HOST,'download',{'file_id':int(file_id),'sub_format':'srt'})
+        except urllib.error.HTTPError as error:
+            if error.code!=401:raise
+            TOKEN=None
+            HOST='api.opensubtitles.com'
+            headers.pop('Authorization',None)
+            if attempt:raise
+            error.close()
+
 sys.path.insert(0,'/app/bazarr/bin/libs')
 import yaml
 import requests
@@ -75,12 +99,7 @@ def main(args):
         result=call('api.opensubtitles.com','subtitles?'+urllib.parse.urlencode(sorted(params.items())))
         print(json.dumps(result))
     elif args['action']=='download':
-        if TOKEN is None:
-            login=call('api.opensubtitles.com','login',dict(username=config['username'],password=config['password']))
-            TOKEN=login['token']
-            HOST=login.get('base_url','api.opensubtitles.com')
-        headers['Authorization']='Bearer '+TOKEN
-        result=call(HOST,'download',{'file_id':int(args['file_id']),'sub_format':'srt'})
+        result=authenticated_download(call,headers,config,args['file_id'])
         url=result['link']
         parsed=urllib.parse.urlparse(url)
         if parsed.scheme!='https':

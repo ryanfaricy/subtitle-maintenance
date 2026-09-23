@@ -11,6 +11,13 @@ limits; `providers.py` and `bazarr_bridge.py` isolate provider access;
 audits and sidecar quarantine without speech recognition or provider calls.
 `bitmap_ocr.py` is a retained legacy engine, called on a copy by the workflow.
 
+The bridge's `authenticated_download` refreshes only its private bearer once for
+download-API HTTP 401. Login never carries the old bearer; content fetches never
+carry API credentials. Do not retry download issuance for content/quota/429/server
+failures because that may consume quota twice. Cooldown schema
+`auth_recovery_version=1` distinguishes post-recovery failures from legacy invalid
+token cooldowns. Only that exact legacy case may be bypassed, never rate limits.
+
 `episode_mapping.py` resolves opt-in title matches in the IMDb-confirmed TVmaze
 catalog. Require a unique normalized title; never guess with a global season
 offset. Preserve local/mapped identities in reports, and never treat catalog

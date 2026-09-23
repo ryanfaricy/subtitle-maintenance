@@ -14,6 +14,21 @@ from .common import atomic_json
 class DownloadBudgetReached(RuntimeError):
     """Local per-run safety cap, not an OpenSubtitles rate-limit response."""
 
+def legacy_token_cooldown(saved):
+    """Only supersede old invalid-token cooldowns created before refresh support.
+
+    Preserve the original record; never bypass quota/429 or new repeated failures.
+    """
+    error=saved.get('error',{})
+    return (saved.get('auth_recovery_version',0)<1 and error.get('status')==401
+            and error.get('stage')=='download'
+            and str(error.get('message','')).strip().lower()=='invalid token')
+
+def provider_error_label(data):
+    if data.get('status')==401:
+        return 'Provider authentication failed (HTTP 401; fresh login did not resolve access)'
+    return 'Provider unavailable: '+str(data.get('status'))+' '+str(data.get('stage'))
+
 def identity(video,config,explicit=None):
     if explicit:return explicit
     database=config.get('bazarr_database')
@@ -50,7 +65,11 @@ class Provider:
             except subprocess.TimeoutExpired:self.process.terminate()
     def request(self,request):
         cooldown=self.state/'provider-cooldown.json'
-        if cooldown.exists() and json.loads(cooldown.read_text())['retry_at']>time.time():raise RuntimeError('Provider cooldown active')
+        if cooldown.exists():
+            saved=json.loads(cooldown.read_text())
+            if saved['retry_at']>time.time() and not legacy_token_cooldown(saved):
+                until=time.strftime('%Y-%m-%d %H:%M:%S UTC',time.gmtime(saved['retry_at']))
+                raise RuntimeError(provider_error_label(saved.get('error',{}))+'; retry after '+until)
         if not self.process:
             script=Path(__file__).with_name('bazarr_bridge.py')
             if os.environ.get('OPENSUBTITLES_API_KEY'):
@@ -70,8 +89,8 @@ class Provider:
             retry=3600
             try:retry=max(retry,int(data.get('retry_after') or 0))
             except ValueError:pass
-            atomic_json(cooldown,dict(retry_at=time.time()+retry,error=data))
-            raise RuntimeError('Provider unavailable: '+str(data.get('status'))+' '+str(data.get('stage')))
+            atomic_json(cooldown,dict(retry_at=time.time()+retry,error=data,auth_recovery_version=1))
+            raise RuntimeError(provider_error_label(data))
         return data
     def candidates(self,ident,prefer_xl):
         # Title is mapping evidence, not an API search parameter. Preserve legacy

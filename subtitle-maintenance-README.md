@@ -152,6 +152,16 @@ notice changes. The tool never clears third-party queues.
 
 ## Configuration and provider access
 
+The standalone helper refreshes its own in-memory login once when the download
+API rejects a token with HTTP 401. It never writes tokens or configuration back
+to Bazarr. Repeated authentication failures report an authentication error and
+retry time; quota/rate-limit/server cooldowns remain enforced. Old cooldown records
+specifically reporting download HTTP 401 `invalid token` are superseded by this
+recovery policy; new repeated failures are not bypassed. Cached downloads remain
+usable during cooldowns. Restart an already-running script to load the fix.
+Both clients still share the OpenSubtitles account's provider-side limits; this
+does not create a separate quota or modify Bazarr's own authentication handling.
+
 Local configuration: `~/scripts/subtitle-maintenance.json`, containing paths and
 policy only, not passwords. `python` points to the existing MLX virtualenv;
 `model` to its local model. Old native-word caches can be reused through
