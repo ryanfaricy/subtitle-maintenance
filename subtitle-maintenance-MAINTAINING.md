@@ -18,6 +18,13 @@ Neither path is automatic spoken-language detection. `DownloadBudgetReached`
 is a typed local deferral; keep it separate from failed verification/provider
 errors, and continue checking cached candidates even when the cap is exhausted.
 
+`media.choose_audio` resolves multiple tagged English dialogue tracks by default
+flag, channel count, then stream index. Exclude commentary/descriptive titles AND
+dispositions. Unknown language does not qualify through this rule. Transcript
+cache keys include the chosen audio index; bump the application version when
+selection policy changes so result caches are reconsidered. No playback settings
+are mutated by analysis selection.
+
 Do not conflate metadata trust, container verification and dialogue verification.
 None proves 100% correctness. Do not loosen verification to make failures pass.
 Keep forced-only tracks distinct from full dialogue. Unknown language needs

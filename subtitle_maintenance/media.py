@@ -33,21 +33,37 @@ def single_untagged_audio(data):
     if len(tracks)!=1:return None
     s=tracks[0];tags=s.get('tags',{})
     if str(tags.get('language','')).strip().lower() not in {'','und'}:return None
-    if re.search(r'commentary|description',tags.get('title',''),re.I):return None
+    if auxiliary_audio(s):return None
     return s['index']
+
+def auxiliary_audio(stream):
+    """Exclude labelled commentary/descriptive audio even when marked default."""
+    flags=stream.get('disposition',{})
+    return (any(flags.get(k) for k in ('comment','visual_impaired','descriptions'))
+            or bool(re.search(r'commentary|description|descriptive',stream.get('tags',{}).get('title',''),re.I)))
+
+def choose_audio(streams):
+    """Prefer container-default English dialogue, then fewer channels and index.
+
+    Channel count is a simple processing-cost heuristic, not a codec benchmark.
+    Missing channel counts rank last. Player-specific preferences are unknowable;
+    this selects analysis audio only and never changes the playback defaults.
+    """
+    audio=[s for s in streams if s.get('codec_type')=='audio'
+           and english_stream(s) and not auxiliary_audio(s)]
+    defaults=[s for s in audio if s.get('disposition',{}).get('default')]
+    pool=defaults or audio
+    return min(pool,key=lambda s:(s.get('channels') or 999,s['index'])) if pool else None
 
 def inventory(video):
     data=probe(video);streams=data.get('streams',[])
     subs=[s for s in streams if s.get('codec_type')=='subtitle']
     full=lambda s:english_stream(s) and not forced(s)
-    audio=[s for s in streams if s.get('codec_type')=='audio' and english_stream(s)
-           and not re.search(r'commentary|description',s.get('tags',{}).get('title',''),re.I)]
-    default=[s for s in audio if s.get('disposition',{}).get('default')]
-    selected=(default or audio)
+    selected=choose_audio(streams)
     return dict(data=data,duration=float(data['format']['duration']),
                 text=[s for s in subs if full(s) and s.get('codec_name') in TEXT],
                 bitmap=[s for s in subs if full(s) and s.get('codec_name') in BITMAP],
-                audio_index=selected[0]['index'] if len(selected)==1 else None)
+                audio_index=selected['index'] if selected else None)
 
 def sidecars(video):
     found=[];ambiguous=[]

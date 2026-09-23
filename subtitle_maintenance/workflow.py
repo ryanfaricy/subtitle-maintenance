@@ -81,6 +81,11 @@ def process(video,args,config,state,provider):
         reason=('Single audio track has no language tag; use --assume-single-untagged-english if appropriate'
                 if media.single_untagged_audio(info['data']) is not None else 'No unambiguous English dialogue track (missing, multiple, or non-English tracks)')
         return dict(record,status='REVIEW_AUDIO_LANGUAGE',detail=reason)
+    selected=next(s for s in info['data']['streams'] if s['index']==info['audio_index'])
+    record['selected_audio']=dict(index=selected['index'],codec=selected.get('codec_name'),
+                                  channels=selected.get('channels'),language=selected.get('tags',{}).get('language','und'),
+                                  default=bool(selected.get('disposition',{}).get('default')))
+    print(f"    Analysis audio: stream {selected['index']} ({selected.get('codec_name','unknown')}, {selected.get('channels','?')} channels)",flush=True)
     folder=state/'staging'/__import__('hashlib').sha256(str(video).encode()).hexdigest()[:20]
     folder.mkdir(parents=True,exist_ok=True)
     originals={str(p):digest(p) for p in sidecars}

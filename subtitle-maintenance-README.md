@@ -9,10 +9,18 @@ no speech recognition or provider downloads.
 
 ### Missing audio language and download limits
 
+Analysis audio selection prefers English dialogue tracks marked default. If more
+than one qualifies (or none is default), it chooses fewer channels, then the lowest
+stream index. Commentary/audio-description titles and dispositions are excluded.
+This is an efficiency heuristic, not a promise to reproduce Plex's user-specific
+playback selection. It changes no video tags/defaults. The selected analysis stream
+prints before verification and is recorded in the JSON report. `--audio-stream`
+remains a single-file explicit override.
+
 `--assume-single-untagged-english` allows normal verification to use exactly one
 audio stream whose language is absent or `und`, with no commentary/description
 title. It does not edit the video or detect the spoken language. Multiple audio
-streams and explicit other languages still require review. Only enable it on
+untagged streams and explicit other languages still require review. Only enable it on
 material you know is English.
 
 `--max-downloads 50` overrides the local per-run cap (default 20). Cached subtitle
