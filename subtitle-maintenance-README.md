@@ -9,7 +9,7 @@ no speech recognition or provider downloads.
 
 ### Alternate episode numbering (opt-in)
 
-`--map-episode-titles` searches using TVmaze's alternate season/episode numbering
+`--map-episode-titles` searches BOTH library numbering and TVmaze's alternate numbering
 when a unique normalized title matches within the IMDb-confirmed show. Episode
 titles currently come from the read-only Bazarr library database; missing,
 duplicate or unnumbered matches require review. No fuzzy or blanket season offsets
@@ -23,6 +23,15 @@ Downloads must still pass all dialogue/timing gates. Library filenames, Sonarr
 metadata and video files are not renumbered. This option only runs when a provider
 search is needed; trusted embedded/verified local subtitles retain their usual path.
 Do not enable it globally without testing each show's catalog alignment.
+
+Results from both searches are deduplicated by provider file ID. Recognizable
+matching titles in releases rank first; explicit other catalog episode titles
+after SxxExx/xxXxx markers are excluded before the candidate limit. Untitled or
+unrecognized releases remain eligible and require dialogue verification. Short
+ambiguous title fragments are not negative evidence. This does not exhaust every
+possible numbering scheme. Rejected titles and search provenance appear in JSON.
+If one search fails, the other can still yield a verified replacement; otherwise
+the result is `DEFERRED_PROVIDER_SEARCH`, not a claim that all searches succeeded.
 
 ```sh
 ~/scripts/subtitle-maintain.py '/Volumes/Media/Plex/TV/American Dad!/Season 10' --limit 4 --map-episode-titles --max-downloads 12

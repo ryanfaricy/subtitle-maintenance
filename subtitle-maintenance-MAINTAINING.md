@@ -25,6 +25,14 @@ agreement as subtitle validation. Search-cache keys intentionally omit the new
 title field to preserve existing caches; mapped season/episode values change the
 key. The option is part of the result-cache configuration fingerprint.
 
+`search_both` unions original and mapped queries (one query when identical).
+`merge_candidates` deduplicates by file ID and ranks recognized matching titles
+before untitled releases. Reject only recognized other catalog titles following
+an episode marker, using longest normalized prefix and a minimum eight-character
+title. Keep unknown releases eligible. Filter before the candidate cap, record
+rejections/provenance, and keep dialogue gates unchanged. Partial search failures
+must remain visible even if candidates from the surviving search can be tested.
+
 `audio_tags.py` owns explicit single-untagged-audio MKV tagging, copy verification
 and original backup. The opt-in runtime assumption lives in media/workflow and
 must not override a known non-English language or ambiguous multiple tracks.

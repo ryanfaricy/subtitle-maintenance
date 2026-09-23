@@ -117,7 +117,13 @@ def process(video,args,config,state,provider):
         print(f"    Title mapping: S{evidence['original_season']:02}E{evidence['original_episode']:02} -> S{ident['season']:02}E{ident['episode']:02} ({evidence['title']}; TVmaze)",flush=True)
     prefer_xl=bool(re.search(r'\b(XL|UNCUT)\b',ident.get('release',''),re.I)) or ('QI' in video.name and info['duration']>=2400)
     record['identity']=ident
-    candidates=provider.candidates(ident,prefer_xl)
+    if record.get('episode_mapping'):
+        from .episode_mapping import search_both
+        candidates,rejected,search_errors=search_both(provider,record['library_identity'],ident,state,prefer_xl)
+        record.update(rejected_candidates=rejected,provider_search_errors=search_errors)
+        print(f'    Combined searches: {len(candidates)} unique eligible candidates; {len(rejected)} wrong-title results excluded',flush=True)
+        for error in search_errors:print('    Search incomplete: '+error['numbering']+': '+error['error'],flush=True)
+    else:candidates=provider.candidates(ident,prefer_xl)
     record['available_candidates']=len(candidates)
     # A single existing English SRT is replaceable; multiple selections need review.
     if len(sidecars)>1:return dict(record,status='REVIEW_MULTIPLE_SIDECARS')
@@ -147,4 +153,6 @@ def process(video,args,config,state,provider):
             record['attempts'].append(dict(provider=entry,deferred='download_budget',error=str(e)))
         except Exception as e:record['attempts'].append(dict(provider=entry,error=str(e)))
     if deferred:return dict(record,status='DEFERRED_DOWNLOAD_BUDGET',detail='Local download cap reached; some candidates not tested. Resume later or increase --max-downloads')
+    if record.get('provider_search_errors'):
+        return dict(record,status='DEFERRED_PROVIDER_SEARCH',detail='One numbering search failed; available candidates did not pass. Retry when provider access recovers')
     return dict(record,status='UNRESOLVED',detail='No tested candidate passed; originals unchanged')

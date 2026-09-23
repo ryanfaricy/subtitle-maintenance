@@ -58,3 +58,55 @@ def map_identity(identity,state):
         catalog=dict(imdb=imdb,show_id=show['id'],episodes=episodes)
         atomic_json(cache,catalog)
     return resolve(identity,catalog)
+
+
+def release_title_match(release, wanted, titles):
+    """Classify explicit titles after an episode marker, not arbitrary substrings.
+
+    Untitled scene releases stay eligible. Only a recognizable different catalog
+    title is excluded. Longest prefix wins (e.g. Part II versus Part I); short
+    ambiguous words are not used as negative evidence. Dialogue remains decisive.
+    """
+    marker=re.search(r'(?:s\d{1,3}[ ._-]*e\d{1,3}|\d{1,3}x\d{1,3})\b',release,re.I)
+    if not marker:return 'unknown'
+    tail=normalized(release[marker.end():])
+    names={normalized(t) for t in titles if t}
+    target=normalized(wanted)
+    if target:names.add(target)
+    matches=[n for n in names if len(n)>=8 and tail.startswith(n)]
+    if not matches:return 'unknown'
+    return 'match' if max(matches,key=len)==target else 'different'
+
+
+def merge_candidates(groups, wanted, titles):
+    """Filter and deduplicate before the workflow applies its candidate budget."""
+    by_id={};rejected=[]
+    for label,entries in groups:
+        for entry in entries:
+            match=release_title_match(entry.get('release',''),wanted,titles)
+            if match=='different':
+                rejected.append(dict(entry,search_numbering=label,reason='Different episode title in release'))
+                continue
+            item=dict(entry,title_match=match,search_numberings=[label])
+            old=by_id.get(entry['file_id'])
+            if old:
+                if label not in old['search_numberings']:old['search_numberings'].append(label)
+                if match=='match':old['title_match']='match'
+            else:by_id[entry['file_id']]=item
+    # Stable sort keeps provider ordering (including XL preference) within tiers.
+    return sorted(by_id.values(),key=lambda e:e['title_match']!='match'),rejected
+
+
+def search_both(provider, original, mapped, state, prefer_xl):
+    groups=[];errors=[];seen=set()
+    for label,ident in [('library',original),('mapped',mapped)]:
+        key=(ident['imdb'],ident['season'],ident['episode'])
+        if key in seen:continue
+        seen.add(key)
+        try:groups.append((label,provider.candidates(ident,prefer_xl)))
+        except Exception as error:errors.append(dict(numbering=label,error=str(error)))
+    if not groups:raise RuntimeError('Both episode searches failed: '+str(errors))
+    catalog=json.loads((state/'episode-catalogs'/(original['imdb']+'.json')).read_text())
+    titles=[e.get('name','') for e in catalog['episodes']]
+    candidates,rejected=merge_candidates(groups,original['title'],titles)
+    return candidates,rejected,errors
