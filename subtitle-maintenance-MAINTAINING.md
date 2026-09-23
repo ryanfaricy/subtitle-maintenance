@@ -11,6 +11,13 @@ limits; `providers.py` and `bazarr_bridge.py` isolate provider access;
 audits and sidecar quarantine without speech recognition or provider calls.
 `bitmap_ocr.py` is a retained legacy engine, called on a copy by the workflow.
 
+`episode_mapping.py` resolves opt-in title matches in the IMDb-confirmed TVmaze
+catalog. Require a unique normalized title; never guess with a global season
+offset. Preserve local/mapped identities in reports, and never treat catalog
+agreement as subtitle validation. Search-cache keys intentionally omit the new
+title field to preserve existing caches; mapped season/episode values change the
+key. The option is part of the result-cache configuration fingerprint.
+
 `audio_tags.py` owns explicit single-untagged-audio MKV tagging, copy verification
 and original backup. The opt-in runtime assumption lives in media/workflow and
 must not override a known non-English language or ambiguous multiple tracks.

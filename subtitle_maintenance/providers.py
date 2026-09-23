@@ -23,8 +23,8 @@ def identity(video,config,explicit=None):
             remote=container.rstrip('/')+remote[len(host.rstrip('/')):];break
     if database and Path(database).exists():
         with sqlite3.connect('file:'+str(database)+'?mode=ro',uri=True) as db:
-            row=db.execute('select e.season,e.episode,s.imdbId,e.sceneName from table_episodes e join table_shows s on e.sonarrSeriesId=s.sonarrSeriesId where e.path=?',(remote,)).fetchone()
-            if row and row[2]:return dict(season=row[0],episode=row[1],imdb=row[2],release=row[3] or '',source='library database')
+            row=db.execute('select e.season,e.episode,s.imdbId,e.sceneName,e.title from table_episodes e join table_shows s on e.sonarrSeriesId=s.sonarrSeriesId where e.path=?',(remote,)).fetchone()
+            if row and row[2]:return dict(season=row[0],episode=row[1],imdb=row[2],release=row[3] or '',title=row[4] or '',source='library database')
             row=db.execute('select imdbId from table_movies where path=?',(remote,)).fetchone()
             if row and row[0]:return dict(imdb=row[0],source='library database')
     ep=re.search(r'\bS(\d{1,2})E(\d{1,3})\b',video.stem,re.I)
@@ -74,7 +74,9 @@ class Provider:
             raise RuntimeError('Provider unavailable: '+str(data.get('status'))+' '+str(data.get('stage')))
         return data
     def candidates(self,ident,prefer_xl):
-        key=hashlib.sha256(json.dumps(ident,sort_keys=True).encode()).hexdigest()
+        # Title is mapping evidence, not an API search parameter. Preserve legacy
+        # cache keys when only a database title was added to the identity.
+        key=hashlib.sha256(json.dumps({k:v for k,v in ident.items() if k!='title'},sort_keys=True).encode()).hexdigest()
         cache=self.state/'searches'/(key+'.json')
         if cache.exists() and time.time()-cache.stat().st_mtime<86400:data=json.loads(cache.read_text())
         else:

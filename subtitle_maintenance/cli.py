@@ -41,6 +41,7 @@ def main():
     p.add_argument('--assume-single-untagged-english',action='store_true',help='Treat one untagged audio stream as English without modifying the video')
     p.add_argument('--tag-missing-audio-english',action='store_true',help='Separate MKV metadata-only mode; single untagged audio only; preview unless --apply')
     p.add_argument('--max-downloads',type=int,help='Maximum new provider downloads this run (default config: 20); cached files do not count')
+    p.add_argument('--map-episode-titles',action='store_true',help='Opt-in TVmaze alternate numbering by unique episode title; library unchanged')
     p.add_argument('--imdb',help='Explicit tt... movie or series ID; one video only')
     p.add_argument('--season',type=int)
     p.add_argument('--episode',type=int)
@@ -57,6 +58,7 @@ def main():
     config.setdefault('python',sys.executable);config.setdefault('model','')
     config['cache_only']=a.cache_only
     config['assume_single_untagged_english']=a.assume_single_untagged_english
+    config['map_episode_titles']=a.map_episode_titles
     if a.max_downloads is not None:config['max_downloads']=a.max_downloads
     a.state_dir=a.state_dir.expanduser().resolve();a.state_dir.mkdir(parents=True,exist_ok=True)
     a.identity=None

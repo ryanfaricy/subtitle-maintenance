@@ -108,6 +108,13 @@ def process(video,args,config,state,provider):
     if args.no_download:return dict(record,status='REVIEW',detail='No verified sidecar; provider search disabled')
     if unknown:return dict(record,status='REVIEW_UNTAGGED_SIDECAR',detail='Unlabelled sidecar present; language is not assumed')
     ident=identity(video,config,args.identity)
+    if config.get('map_episode_titles') and ident.get('season') is not None:
+        from .episode_mapping import map_identity,MappingReview
+        record['library_identity']=dict(ident)
+        try:ident,evidence=map_identity(ident,state)
+        except MappingReview as e:return dict(record,status='REVIEW_EPISODE_MAPPING',detail=str(e))
+        record['episode_mapping']=evidence
+        print(f"    Title mapping: S{evidence['original_season']:02}E{evidence['original_episode']:02} -> S{ident['season']:02}E{ident['episode']:02} ({evidence['title']}; TVmaze)",flush=True)
     prefer_xl=bool(re.search(r'\b(XL|UNCUT)\b',ident.get('release',''),re.I)) or ('QI' in video.name and info['duration']>=2400)
     record['identity']=ident
     candidates=provider.candidates(ident,prefer_xl)

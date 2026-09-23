@@ -7,6 +7,27 @@ no speech recognition or provider downloads.
 
 ## Commands
 
+### Alternate episode numbering (opt-in)
+
+`--map-episode-titles` searches using TVmaze's alternate season/episode numbering
+when a unique normalized title matches within the IMDb-confirmed show. Episode
+titles currently come from the read-only Bazarr library database; missing,
+duplicate or unnumbered matches require review. No fuzzy or blanket season offsets
+are used. Normalization ignores case/punctuation and treats `&` as `and`.
+The full catalog is cached for seven days in `episode-catalogs/`; reports preserve
+the local identity and TVmaze episode ID, URL and air date. Air date is provenance,
+not a comparison gate (the current local database does not supply it).
+
+This is an alternate search, not proof that OpenSubtitles uses TVmaze ordering.
+Downloads must still pass all dialogue/timing gates. Library filenames, Sonarr
+metadata and video files are not renumbered. This option only runs when a provider
+search is needed; trusted embedded/verified local subtitles retain their usual path.
+Do not enable it globally without testing each show's catalog alignment.
+
+```sh
+~/scripts/subtitle-maintain.py '/Volumes/Media/Plex/TV/American Dad!/Season 10' --limit 4 --map-episode-titles --max-downloads 12
+```
+
 ### Missing audio language and download limits
 
 Analysis audio selection prefers English dialogue tracks marked default. If more
