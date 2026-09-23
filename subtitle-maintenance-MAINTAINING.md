@@ -11,6 +11,14 @@ limits; `providers.py` and `bazarr_bridge.py` isolate provider access;
 audits and sidecar quarantine without speech recognition or provider calls.
 `bitmap_ocr.py` is a retained legacy engine, called on a copy by the workflow.
 
+Provider helper IPC uses binary os.read with one total response deadline, avoiding
+TextIO buffering/select mismatches and blocking readline on partial responses.
+Discard/reap a failed helper so delayed replies cannot satisfy another request.
+Search transport retries are capped at one; never replay an uncertain download.
+Diagnostics retain exception class, action and process status, not arbitrary
+exception text/response bodies. `transport_recovery_version=1` marks modern
+cooldowns; only exact legacy generic transport failures are bypassable.
+
 The bridge's `authenticated_download` refreshes only its private bearer once for
 download-API HTTP 401. Login never carries the old bearer; content fetches never
 carry API credentials. Do not retry download issuance for content/quota/429/server

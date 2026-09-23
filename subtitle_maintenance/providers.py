@@ -14,6 +14,33 @@ from .common import atomic_json
 class DownloadBudgetReached(RuntimeError):
     """Local per-run safety cap, not an OpenSubtitles rate-limit response."""
 
+class ProviderTransportError(RuntimeError):
+    """Sanitized helper failure; never carries response bodies or credentials."""
+
+def read_helper_response(process,timeout):
+    # Binary reads avoid TextIO.readline blocking forever on partial JSON and
+    # avoid select() overlooking bytes buffered inside a Python text wrapper.
+    deadline=time.monotonic()+timeout;buffer=bytearray()
+    while True:
+        remaining=deadline-time.monotonic()
+        if remaining<=0 or not select.select([process.stdout],[],[],remaining)[0]:
+            raise ProviderTransportError('response_timeout')
+        chunk=os.read(process.stdout.fileno(),65536)
+        if not chunk:raise ProviderTransportError('helper_eof')
+        buffer.extend(chunk)
+        if len(buffer)>8*1024*1024:raise ProviderTransportError('oversized_response')
+        if b'\n' in buffer:
+            line,extra=bytes(buffer).split(b'\n',1)
+            if extra.strip():raise ProviderTransportError('unexpected_extra_response')
+            try:data=json.loads(line)
+            except (ValueError,UnicodeError):raise ProviderTransportError('invalid_json') from None
+            if not isinstance(data,dict):raise ProviderTransportError('invalid_response_shape')
+            return data
+
+def legacy_transport_cooldown(saved):
+    return (saved.get('transport_recovery_version',0)<1
+            and saved.get('error')=={'error':'Provider transport failure'})
+
 def legacy_token_cooldown(saved):
     """Only supersede old invalid-token cooldowns created before refresh support.
 
@@ -25,9 +52,12 @@ def legacy_token_cooldown(saved):
             and str(error.get('message','')).strip().lower()=='invalid token')
 
 def provider_error_label(data):
+    if data.get('error')=='Provider transport failure':
+        return ('Provider helper communication failed: '+data.get('reason','unknown legacy transport failure')
+                +' (action='+str(data.get('action','unknown'))+', exit='+str(data.get('helper_exit','unknown'))+')')
     if data.get('status')==401:
         return 'Provider authentication failed (HTTP 401; fresh login did not resolve access)'
-    return 'Provider unavailable: '+str(data.get('status'))+' '+str(data.get('stage'))
+    return 'Provider unavailable: '+str(data.get('status') or data.get('error','unknown error'))+' '+str(data.get('stage') or '')
 
 def identity(video,config,explicit=None):
     if explicit:return explicit
@@ -59,17 +89,21 @@ class Provider:
     def __init__(self,config,state):
         self.config=config;self.state=state;self.process=None;self.last=0;self.downloads=0
     def close(self):
-        if self.process:
-            self.process.stdin.close()
-            try:self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:self.process.terminate()
-    def request(self,request):
-        cooldown=self.state/'provider-cooldown.json'
-        if cooldown.exists():
-            saved=json.loads(cooldown.read_text())
-            if saved['retry_at']>time.time() and not legacy_token_cooldown(saved):
-                until=time.strftime('%Y-%m-%d %H:%M:%S UTC',time.gmtime(saved['retry_at']))
-                raise RuntimeError(provider_error_label(saved.get('error',{}))+'; retry after '+until)
+        process=self.process;self.process=None
+        if process:
+            try:
+                try:process.stdin.close()
+                except (OSError,ValueError):pass
+                try:process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.terminate()
+                    try:process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        process.kill();process.wait(timeout=3)
+            finally:process.stdout.close()
+
+    def exchange(self,request):
+        if self.process and self.process.poll() is not None:self.close()
         if not self.process:
             script=Path(__file__).with_name('bazarr_bridge.py')
             if os.environ.get('OPENSUBTITLES_API_KEY'):
@@ -77,19 +111,33 @@ class Provider:
             elif self.config.get('bazarr_container'):
                 command=['docker','exec','-i',self.config['bazarr_container'],'python3','-u','-c',script.read_text()]
             else:raise ValueError('Configure OpenSubtitles credentials or existing Bazarr credential bridge')
-            self.process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
-        time.sleep(max(0,1.1-(time.monotonic()-self.last)))
-        self.last=time.monotonic()
-        try:
-            self.process.stdin.write(json.dumps(request)+'\n');self.process.stdin.flush()
-            if not select.select([self.process.stdout],[],[],150)[0]:raise TimeoutError()
-            data=json.loads(self.process.stdout.readline())
-        except Exception: data={'error':'Provider transport failure'}
+            self.process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+        time.sleep(max(0,1.1-(time.monotonic()-self.last)));self.last=time.monotonic()
+        self.process.stdin.write((json.dumps(request)+'\n').encode());self.process.stdin.flush()
+        return read_helper_response(self.process,240 if request.get('action')=='download' else 150)
+    def request(self,request):
+        cooldown=self.state/'provider-cooldown.json'
+        if cooldown.exists():
+            saved=json.loads(cooldown.read_text())
+            if saved['retry_at']>time.time() and not (legacy_token_cooldown(saved) or legacy_transport_cooldown(saved)):
+                until=time.strftime('%Y-%m-%d %H:%M:%S UTC',time.gmtime(saved['retry_at']))
+                raise RuntimeError(provider_error_label(saved.get('error',{}))+'; retry after '+until)
+        for attempt in range(2):
+            try:
+                data=self.exchange(request)
+                break
+            except (ProviderTransportError,OSError) as error:
+                data=dict(error='Provider transport failure',
+                          reason=str(error) if isinstance(error,ProviderTransportError) else type(error).__name__,
+                          action=request.get('action'),helper_exit=self.process.poll() if self.process else None)
+                self.close() # Discard late output; it must never become the next request's reply.
+                if request.get('action')!='search' or attempt:break
+                print('    Provider helper connection failed; retrying search once with a fresh helper',flush=True)
         if 'error' in data:
-            retry=3600
+            retry=300 if data.get('error')=='Provider transport failure' else 3600
             try:retry=max(retry,int(data.get('retry_after') or 0))
             except ValueError:pass
-            atomic_json(cooldown,dict(retry_at=time.time()+retry,error=data,auth_recovery_version=1))
+            atomic_json(cooldown,dict(retry_at=time.time()+retry,error=data,auth_recovery_version=1,transport_recovery_version=1))
             raise RuntimeError(provider_error_label(data))
         return data
     def candidates(self,ident,prefer_xl):

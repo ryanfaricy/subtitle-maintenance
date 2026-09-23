@@ -177,6 +177,15 @@ notice changes. The tool never clears third-party queues.
 
 ## Configuration and provider access
 
+Helper transport failures now report a sanitized cause (timeout, EOF, malformed
+response or OS exception class), action and available exit status. The failed
+helper is closed/reaped before another request; a read-only search retries once.
+Uncertain download requests are NOT replayed automatically, since a provider may
+already have counted them. Repeated transport failures use a five-minute cooldown;
+HTTP/quota/auth cooldowns retain their separate policy. Legacy generic transport
+cooldowns are superseded on restart; new failures and provider limits are not.
+No raw responses, stderr, signed links or credentials are captured in diagnostics.
+
 The standalone helper refreshes its own in-memory login once when the download
 API rejects a token with HTTP 401. It never writes tokens or configuration back
 to Bazarr. Repeated authentication failures report an authentication error and
