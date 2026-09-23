@@ -41,6 +41,7 @@ def main():
     p.add_argument('--assume-single-untagged-english',action='store_true',help='Treat one untagged audio stream as English without modifying the video')
     p.add_argument('--tag-missing-audio-english',action='store_true',help='Separate MKV metadata-only mode; single untagged audio only; preview unless --apply')
     p.add_argument('--max-downloads',type=int,help='Maximum new provider downloads this run (default config: 20); cached files do not count')
+    p.add_argument('--max-candidates',type=int,help='Maximum unique candidates attempted per video (default config: 3)')
     p.add_argument('--map-episode-titles',action='store_true',help='Opt-in TVmaze alternate numbering by unique episode title; library unchanged')
     p.add_argument('--imdb',help='Explicit tt... movie or series ID; one video only')
     p.add_argument('--season',type=int)
@@ -48,6 +49,7 @@ def main():
     p.add_argument('--restore',type=Path,help='Restore a committed receipt, preview unless --apply')
     a=p.parse_args()
     if a.max_downloads is not None and a.max_downloads<0:p.error('--max-downloads must be zero or greater')
+    if a.max_candidates is not None and a.max_candidates<1:p.error('--max-candidates must be at least 1')
     modes=[a.audit is not None,a.cleanup_sidecars,a.restore_quarantine is not None,a.restore is not None,a.scan_only,a.tag_missing_audio_english]
     if sum(modes)>1:p.error('Choose only one audit, cleanup, restore, or scan mode')
     if a.audit and a.apply:p.error('--audit is read-only')
@@ -60,6 +62,7 @@ def main():
     config['assume_single_untagged_english']=a.assume_single_untagged_english
     config['map_episode_titles']=a.map_episode_titles
     if a.max_downloads is not None:config['max_downloads']=a.max_downloads
+    if a.max_candidates is not None:config['max_candidates']=a.max_candidates
     a.state_dir=a.state_dir.expanduser().resolve();a.state_dir.mkdir(parents=True,exist_ok=True)
     a.identity=None
     if a.imdb:

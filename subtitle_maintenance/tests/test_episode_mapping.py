@@ -39,3 +39,21 @@ class EpisodeMappingTests(unittest.TestCase):
     def test_longest_title_and_number_marker(self):
         self.assertEqual(release_title_match('American Dad 12x08 Morning Mimosa.WEB','Morning Mimosa',['Morning Mimosa']),'match')
         self.assertEqual(release_title_match('Show S01E01 Long Title Part II.WEB','Long Title Part I',['Long Title Part I','Long Title Part II']),'different')
+
+    def test_short_exact_title_promoted_not_prefix(self):
+        self.assertEqual(release_title_match('American.Dad.S12E02.CIAPOW.1080p.WEB-DL','CIAPOW',[]),'match')
+        self.assertEqual(release_title_match('Show.S01E01.CIAPOW.WEB','CIA',[]),'unknown')
+        self.assertEqual(release_title_match('Show.S01E01.CIAPOW.WEB','Other Title',['CIAPOW']),'unknown')
+
+    def test_typo_only_promotes(self):
+        title="Steve and Snot's Test-Tubular Adventure"
+        release='American.Dad.S09E01.Steve.and.Snots.Testubular.Adventure.WEB-DL.x264.AAC'
+        self.assertEqual(release_title_match(release,title,[]),'near_match')
+        self.assertEqual(release_title_match('Show.S01E01.HDTV.x264-KILLERS',title,[]),'unknown')
+
+    def test_ranking_tiers(self):
+        title="Steve and Snot's Test-Tubular Adventure"
+        names=['Show.S01E01.HDTV','Show.S01E01.Steve.and.Snots.Testubular.Adventure.WEB-DL','Show.S01E01.Steve.and.Snots.Test.Tubular.Adventure.WEB-DL']
+        kept,rejected=merge_candidates([('library',[dict(file_id=i,release=n) for i,n in enumerate(names)])],title,[])
+        self.assertEqual([e['file_id'] for e in kept],[2,1,0])
+        self.assertEqual(rejected,[])

@@ -33,6 +33,22 @@ possible numbering scheme. Rejected titles and search provenance appear in JSON.
 If one search fails, the other can still yield a verified replacement; otherwise
 the result is `DEFERRED_PROVIDER_SEARCH`, not a claim that all searches succeeded.
 
+Trial ranking also promotes short exact titles (e.g. CIAPOW) at token boundaries.
+Long titles with minor spelling differences rank after exact matches and before
+unknown releases. Approximate matches NEVER authorize installation or rejection.
+The same dialogue/timing gates remain required.
+
+Use `--max-candidates 10` to attempt up to ten unique provider files per episode
+instead of the default three. This is separate from `--max-downloads`, the run-wide
+new-download cap. `MORE_CANDIDATES_REMAIN` means eligible results were left beyond
+the attempt limit. Reruns reuse cached downloads/transcripts but may repeat failed
+verification before reaching additional candidates; there is no per-candidate
+resume cursor. Start with a preview:
+
+```sh
+~/scripts/subtitle-maintain.py '/Volumes/Media/Plex/TV/American Dad!/Season 12' --map-episode-titles --max-candidates 10 --max-downloads 50
+```
+
 ```sh
 ~/scripts/subtitle-maintain.py '/Volumes/Media/Plex/TV/American Dad!/Season 10' --limit 4 --map-episode-titles --max-downloads 12
 ```

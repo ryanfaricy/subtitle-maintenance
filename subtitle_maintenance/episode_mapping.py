@@ -5,6 +5,7 @@ Only a unique exact normalized episode-title match in the IMDb-matched show is
 accepted. The existing dialogue gates must still approve any downloaded subtitle.
 """
 import json
+from difflib import SequenceMatcher
 import re
 import time
 import unicodedata
@@ -69,13 +70,24 @@ def release_title_match(release, wanted, titles):
     """
     marker=re.search(r'(?:s\d{1,3}[ ._-]*e\d{1,3}|\d{1,3}x\d{1,3})\b',release,re.I)
     if not marker:return 'unknown'
-    tail=normalized(release[marker.end():])
+    raw=release[marker.end():]
+    tail=normalized(raw)
     names={normalized(t) for t in titles if t}
     target=normalized(wanted)
     if target:names.add(target)
     matches=[n for n in names if len(n)>=8 and tail.startswith(n)]
-    if not matches:return 'unknown'
-    return 'match' if max(matches,key=len)==target else 'different'
+    if matches:return 'match' if max(matches,key=len)==target else 'different'
+    # Short exact titles may PROMOTE, never reject. Require a token boundary so
+    # "CIA" cannot match "CIAPOW". Punctuation inside a title remains harmless.
+    prefixes=[normalized(raw[:m.start()]) for m in re.finditer(r'[\s._-]+|$',raw)]
+    if target and target in prefixes:return 'match'
+    # Conservative fuzzy ranking only, stopping before recognizable release tags.
+    # Never let approximate evidence exclude a candidate or bypass dialogue gates.
+    title_part=re.split(r'(?i)(?:^|[\s._-])(?:\d{3,4}p|web(?:rip|[ ._-]?dl)?|hdtv|dvdrip|bluray|bdrip|x26[45]|h26[45]|aac|dd5)[\s._-]?',raw,maxsplit=1)[0]
+    candidate=normalized(title_part)
+    if len(target)>=12 and len(candidate)>=12 and SequenceMatcher(None,target,candidate,autojunk=False).ratio()>=0.92:
+        return 'near_match'
+    return 'unknown'
 
 
 def merge_candidates(groups, wanted, titles):
@@ -91,10 +103,11 @@ def merge_candidates(groups, wanted, titles):
             old=by_id.get(entry['file_id'])
             if old:
                 if label not in old['search_numberings']:old['search_numberings'].append(label)
-                if match=='match':old['title_match']='match'
+                rank={'match':0,'near_match':1,'unknown':2}
+                if rank[match]<rank[old['title_match']]:old['title_match']=match
             else:by_id[entry['file_id']]=item
     # Stable sort keeps provider ordering (including XL preference) within tiers.
-    return sorted(by_id.values(),key=lambda e:e['title_match']!='match'),rejected
+    return sorted(by_id.values(),key=lambda e:{'match':0,'near_match':1,'unknown':2}[e['title_match']]),rejected
 
 
 def search_both(provider, original, mapped, state, prefer_xl):

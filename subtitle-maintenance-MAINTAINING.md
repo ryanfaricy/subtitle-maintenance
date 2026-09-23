@@ -47,6 +47,13 @@ cache keys include the chosen audio index; bump the application version when
 selection policy changes so result caches are reconsidered. No playback settings
 are mutated by analysis selection.
 
+Candidate-ranking trial: short exact target titles at token boundaries are
+positive evidence only. SequenceMatcher >=0.92 on normalized titles of at least
+12 characters (after stripping recognized release tags) provides a middle ranking
+tier, never exclusion/acceptance. Exact known other long catalog titles still
+take precedence. `--max-candidates` is a positive per-video attempt bound; retain
+the independent global download cap and report remaining unattempted candidates.
+
 Do not conflate metadata trust, container verification and dialogue verification.
 None proves 100% correctness. Do not loosen verification to make failures pass.
 Keep forced-only tracks distinct from full dialogue. Unknown language needs

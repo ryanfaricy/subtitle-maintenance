@@ -125,6 +125,8 @@ def process(video,args,config,state,provider):
         for error in search_errors:print('    Search incomplete: '+error['numbering']+': '+error['error'],flush=True)
     else:candidates=provider.candidates(ident,prefer_xl)
     record['available_candidates']=len(candidates)
+    record['candidate_limit']=config.get('max_candidates',3)
+    record['candidates_beyond_limit']=max(0,len(candidates)-record['candidate_limit'])
     # A single existing English SRT is replaceable; multiple selections need review.
     if len(sidecars)>1:return dict(record,status='REVIEW_MULTIPLE_SIDECARS')
     target=sidecars[0] if sidecars else video.with_name(video.stem+'.en.srt')
@@ -155,4 +157,6 @@ def process(video,args,config,state,provider):
     if deferred:return dict(record,status='DEFERRED_DOWNLOAD_BUDGET',detail='Local download cap reached; some candidates not tested. Resume later or increase --max-downloads')
     if record.get('provider_search_errors'):
         return dict(record,status='DEFERRED_PROVIDER_SEARCH',detail='One numbering search failed; available candidates did not pass. Retry when provider access recovers')
+    if record['candidates_beyond_limit']:
+        return dict(record,status='MORE_CANDIDATES_REMAIN',detail=f"{record['candidates_beyond_limit']} eligible candidates beyond the attempt limit; increase --max-candidates. Originals unchanged")
     return dict(record,status='UNRESOLVED',detail='No tested candidate passed; originals unchanged')
