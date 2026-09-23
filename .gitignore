@@ -1,0 +1,21 @@
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+
+# Operational logs and local state
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# Media-processing temporary and backup files
+*.alass-temp.*
+*.synced.*
+*.old-srt
+*.old-ass
+*.old-ssa
+
+# macOS metadata
+.DS_Store
+*.mp4
+seconv-5.2.0/*
