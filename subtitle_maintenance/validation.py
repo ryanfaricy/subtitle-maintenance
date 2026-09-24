@@ -64,7 +64,8 @@ def full_check(cues, words, duration):
     span = max((x["start"] for x in evidence), default=0) - min(
         (x["start"] for x in evidence), default=0
     )
-    coverage = len(evidence) / len(cues) if cues else 0
+    dialogue_cues = sum(not c.get("non_dialogue_drawing", False) for c in cues)
+    coverage = len(evidence) / dialogue_cues if dialogue_cues else 0
     valid = all(
         0 <= c["start"] < c["end"] <= duration + 2 and c["end"] - c["start"] <= 15 for c in cues
     )

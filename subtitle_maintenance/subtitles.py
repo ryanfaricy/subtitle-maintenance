@@ -7,6 +7,58 @@ from .validation import full_check, interval_check, phrase_evidence
 
 STAMP = r"\d+:\d{2}:\d{2}[,.]\d{1,3}"
 TIMING = re.compile(r"^(" + STAMP + r")\s*-->\s*(" + STAMP + r")[^\n]*$", re.M)
+DIALOGUE_SCORING_VERSION = 2
+
+
+def drawing_path(text):
+    """Recognize a complete vector path, never a substring of spoken text."""
+    parts = text.strip().split()
+    if not parts or parts[0] != "m":
+        return False
+    commands = []
+    for part in parts:
+        if part in {"m", "n", "l", "b", "s", "p", "c"}:
+            commands.append([part, 0])
+        elif commands and re.fullmatch(r"-?\d+(?:\.\d+)?", part):
+            commands[-1][1] += 1
+        else:
+            return False
+    if len(commands) < 2 or sum(count for _, count in commands) < 6:
+        return False
+    return all(
+        count == 0
+        if command == "c"
+        else count >= 6 and count % 6 == 0
+        if command == "b"
+        else count >= 6 and count % 2 == 0
+        if command == "s"
+        else count >= 2 and count % 2 == 0
+        for command, count in commands
+    )
+
+
+def dialogue_text(text):
+    """Exclude ASS drawing spans for scoring; retain original cue text elsewhere.
+
+    Explicit \\pN drawing mode ends at \\p0 or a style reset. Some SRT exports
+    lose that flag but retain positioning tags and complete vector paths: only
+    those strictly recognized spans are excluded. Ambiguous text remains text.
+    """
+    text = html.unescape(text)
+    positioned = bool(re.search(r"\\(?:pos|move)\s*\(|\\an[1-9]\b", text))
+    drawing = False
+    removed = False
+    spoken = []
+    for part in re.split(r"(\{[^}]*\})", text):
+        if part.startswith("{") and part.endswith("}"):
+            for tag in re.finditer(r"\\p(\d+)(?![\d\w])|\\r(?:[^\\}]*)", part):
+                drawing = bool(int(tag[1])) if tag[1] is not None else False
+            continue
+        if part.strip() and (drawing or (positioned and drawing_path(part))):
+            removed = True
+        else:
+            spoken.append(part)
+    return re.sub(r"<[^>]*>", " ", " ".join(spoken)), removed
 
 
 def seconds(value):
@@ -15,7 +67,7 @@ def seconds(value):
 
 
 def tokens(text):
-    text = re.sub(r"<[^>]*>|\{[^}]*\}", " ", html.unescape(text))
+    text, _ = dialogue_text(text)
     return re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)?", text.lower().replace("’", "'"))
 
 
@@ -34,7 +86,17 @@ def read(path):
         body = re.sub(r"\n\s*\d+\s*$", "", body).strip()
         if not body:
             raise ValueError("Empty cue")
-        cues.append(dict(start=seconds(m[1]), end=seconds(m[2]), text=body, tokens=tokens(body)))
+        cue_tokens = tokens(body)
+        _, removed_drawing = dialogue_text(body)
+        cues.append(
+            dict(
+                start=seconds(m[1]),
+                end=seconds(m[2]),
+                text=body,
+                tokens=cue_tokens,
+                non_dialogue_drawing=removed_drawing and not cue_tokens,
+            )
+        )
     if not cues:
         raise ValueError("No readable SRT cues")
     return cues

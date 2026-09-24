@@ -207,6 +207,9 @@ def main(argv=None):
     config.setdefault("python", sys.executable)
     config.setdefault("model", "")
     config["cache_only"] = args.cache_only
+    from .subtitles import DIALOGUE_SCORING_VERSION
+
+    config["dialogue_scoring_version"] = DIALOGUE_SCORING_VERSION
     config["assume_single_untagged_english"] = args.assume_single_untagged_english
     config["map_episode_titles"] = args.map_episode_titles
     config["allow_drift_correction"] = args.allow_drift_correction

@@ -30,6 +30,15 @@ existing state locations are preserved. No verification gates were changed.
 
 ## Active architecture
 
+Dialogue scoring excludes explicit ASS drawing-mode spans and conservatively
+recognized complete vector paths with retained positioning tags in SRT exports.
+Mixed cues keep their spoken text; ambiguous number/letter sequences remain text.
+Only confirmed drawing-only cues are excluded from the phrase coverage denominator.
+Cue text, timestamps and rendering markup are never edited by this normalization.
+`DIALOGUE_SCORING_VERSION` invalidates result caches, and preservation policy 2
+reconsiders prior decisions. Raw transcription caches remain reusable. Do not
+strip all numeric text or all positioned cues; those can contain real dialogue.
+
 `preservation.py` is an opt-in unchanged-SRT retention policy, not a replacement
 validation gate. It aligns exact normalized words in order with SequenceMatcher
 (autojunk disabled), retaining all subtitle words in the denominator, including

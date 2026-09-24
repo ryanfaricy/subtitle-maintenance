@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 
 from .validation import phrase_evidence
 
-POLICY_VERSION = 1
+POLICY_VERSION = 2
 TIMING_TOLERANCE = 1.5
 
 
