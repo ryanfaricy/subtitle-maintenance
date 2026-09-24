@@ -276,6 +276,8 @@ def process(video, args, config, state, provider):
                     scale=check.get("scale", 1),
                     detail=f"Timing scale {check.get('scale', 1):.6f}, offset {check['offset']:+.3f}s",
                 )
+        except native.TranscriptionError:
+            raise
         except Exception as e:
             record["attempts"].append(dict(source=str(source), error=str(e)))
     if args.no_download:
@@ -367,6 +369,8 @@ def process(video, args, config, state, provider):
             record["attempts"].append(
                 dict(provider=entry, deferred="download_budget", error=str(e))
             )
+        except native.TranscriptionError:
+            raise
         except Exception as e:
             record["attempts"].append(dict(provider=entry, error=str(e)))
     if deferred:

@@ -1,6 +1,7 @@
-"""Read-only local setup checks: never run tools, contact services, or create state."""
+"""Read-only local setup checks: no media processing, service calls, or model loading."""
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,6 +37,33 @@ def checks(config):
             "transcription Python: " + ("available" if shutil.which(runtime) else "not found"),
         )
     )
+    if shutil.which(runtime):
+        try:
+            probe = subprocess.run(
+                [
+                    runtime,
+                    "-c",
+                    "import importlib.util; raise SystemExit(0 if all(importlib.util.find_spec(n) is not None for n in ('mlx', 'mlx_whisper')) else 1)",
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+            )
+            available = probe.returncode == 0
+            message = (
+                "available (model not loaded)" if available else "missing or Python probe failed"
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            available = False
+            message = "Python probe failed or timed out"
+        results.append(
+            (
+                "OK" if available else ("ERROR" if config.get("model") else "WARN"),
+                "MLX packages: " + message,
+            )
+        )
     model = config.get("model")
     model_exists = bool(model) and (
         not model.startswith(("/", ".", "~")) or Path(model).expanduser().exists()

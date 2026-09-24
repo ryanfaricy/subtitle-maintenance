@@ -10,7 +10,7 @@ from pathlib import Path
 
 from script_config import load_config, state_path
 
-from . import __version__, media
+from . import __version__, media, native
 from .common import atomic_json, digest, fingerprint, install
 from .providers import Provider
 from .workflow import process
@@ -287,6 +287,7 @@ def main(argv=None):
                 if args.limit and n > args.limit:
                     break
                 print(f"[{n}] {video}", flush=True)
+                transcription_failed = False
                 try:
                     sidecars, unknown = media.sidecars(video)
                     signature = hashlib.sha256(
@@ -325,6 +326,10 @@ def main(argv=None):
                         data = dict(data, cached=True)
                     else:
                         data = process(video, args, config, args.state_dir, provider)
+                except native.TranscriptionError as e:
+                    data = dict(video=str(video), status="ERROR", error=str(e))
+                    signature = ""
+                    transcription_failed = True
                 except Exception as e:
                     data = dict(video=str(video), status="ERROR", error=str(e))
                     signature = ""
@@ -351,6 +356,12 @@ def main(argv=None):
                     args.state_dir / "latest-report.json",
                     dict(version=__version__, counts=dict(counts), results=report),
                 )
+                if transcription_failed:
+                    print(
+                        "Stopping: restore transcription before retrying; progress is saved.",
+                        flush=True,
+                    )
+                    break
         finally:
             provider.close()
             db.close()

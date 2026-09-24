@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -589,8 +590,14 @@ def main(argv=None):
 
     if args.dry_run:
         db = sqlite3.connect(":memory:")
+        if STATE_DB.exists():
+            # Copy a read-only snapshot so preview honors caches and cooldowns.
+            with closing(
+                sqlite3.connect(STATE_DB.resolve().as_uri() + "?mode=ro", uri=True)
+            ) as saved:
+                saved.backup(db)
         db.row_factory = sqlite3.Row
-        db.execute("""CREATE TABLE files (path TEXT PRIMARY KEY, size INTEGER, mtime_ns INTEGER,
+        db.execute("""CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, size INTEGER, mtime_ns INTEGER,
             first_seen REAL, last_checked REAL, status TEXT, subtitle_path TEXT, error TEXT, failure_time REAL)""")
     else:
         db = connect_db()

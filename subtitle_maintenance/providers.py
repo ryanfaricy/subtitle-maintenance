@@ -10,6 +10,8 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from script_config import tool
+
 from .common import atomic_json
 
 
@@ -179,7 +181,7 @@ class Provider:
                 command = [self.config["python"], "-u", str(script)]
             elif self.config.get("bazarr_container"):
                 command = [
-                    "docker",
+                    tool(self.config, "docker"),
                     "exec",
                     "-i",
                     self.config["bazarr_container"],

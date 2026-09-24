@@ -20,7 +20,24 @@ def words(data, offset=0):
     return result
 
 
+class TranscriptCacheMiss(ValueError):
+    """Cache-only mode has no transcript for this video/window."""
+
+
+class TranscriptionError(RuntimeError):
+    """Audio/transcription infrastructure failed; trying more subtitles cannot help."""
+
+
 def transcript(video, info, start, length, config, state):
+    try:
+        return _transcript(video, info, start, length, config, state)
+    except TranscriptCacheMiss:
+        raise
+    except Exception as exc:
+        raise TranscriptionError(f"Transcription unavailable: {exc}") from exc
+
+
+def _transcript(video, info, start, length, config, state):
     model = config["model"]
     audio = info["audio_index"]
     if audio is None:
@@ -45,7 +62,7 @@ def transcript(video, info, start, length, config, state):
         if old.exists():
             return json.loads(old.read_text())
     if config.get("cache_only"):
-        raise ValueError("Native transcript not cached; rerun without --cache-only")
+        raise TranscriptCacheMiss("Native transcript not cached; rerun without --cache-only")
     if not config.get("python") or not model:
         raise ValueError("Whisper Python/model not configured")
     cache.parent.mkdir(parents=True, exist_ok=True)

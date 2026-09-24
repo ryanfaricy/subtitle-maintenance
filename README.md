@@ -186,3 +186,15 @@ python3 -m unittest discover -s subtitle_maintenance/tests -v
 ```
 
 Tests use temporary fixtures and mocked services. They do not process live media.
+
+### Runtime diagnostics and retry behavior
+
+Doctor runs a bounded package-discovery check in the configured Python to detect
+missing MLX packages; it does not import MLX or load a model. Package discovery
+cannot prove model compatibility or successful GPU execution.
+
+Native transcription failures report ERROR, save progress and stop the run so
+additional candidates do not consume downloads. Fix the cause and rerun; keep
+existing caches. Cache-only misses remain per-candidate review cases. The separate
+Whisper script previews a read-only snapshot of saved classifications and retry
+cooldowns, without updating the on-disk database. Provider helpers honor tools.docker.
