@@ -230,6 +230,39 @@ def process(video, args, config, state, provider):
     folder = state / "staging" / __import__("hashlib").sha256(str(video).encode()).hexdigest()[:20]
     folder.mkdir(parents=True, exist_ok=True)
     originals = {str(p): digest(p) for p in sidecars}
+    # Check every existing SRT before allowing any repair/provider work. This is
+    # preservation of unchanged files only, never permission to install a result.
+    if config.get("keep_existing_95"):
+        from .preservation import assess
+
+        for source in sidecars:
+            if originals[str(source)] in config.get("human_approved_sha256", []):
+                return dict(
+                    record,
+                    status="HUMAN_APPROVED",
+                    subtitle=str(source),
+                    installed_sha256=originals[str(source)],
+                )
+        srt_sources = [source for source in sidecars if source.suffix.lower() == ".srt"]
+        if srt_sources:
+            full = native.words(native.transcript(video, info, None, None, config, state))
+            record["preservation_checks"] = []
+            for source in srt_sources:
+                try:
+                    check = assess(subtitles.read(source), full, info["duration"])
+                except ValueError:
+                    check = dict(passed=False, reason="Existing SRT could not be parsed")
+                record["preservation_checks"].append(dict(source=str(source), check=check))
+                if check["passed"]:
+                    if fingerprint(video) != fp or digest(source) != originals[str(source)]:
+                        raise ValueError("Source changed during preservation check; retry")
+                    return dict(
+                        record,
+                        status="KEPT_EXISTING",
+                        subtitle=str(source),
+                        installed_sha256=originals[str(source)],
+                        detail=f"Existing subtitles kept unchanged: word agreement {check['dialogue_agreement']:.1%}, timing agreement {check['timing_agreement']:.1%} within 1.5s; no provider search. ASR agreement, not guaranteed accuracy.",
+                    )
     for source in sidecars:
         if originals[str(source)] in config.get("human_approved_sha256", []):
             return dict(
@@ -392,5 +425,9 @@ def process(video, args, config, state, provider):
             detail=f"{record['candidates_beyond_limit']} eligible candidates beyond the attempt limit; increase --max-candidates. Originals unchanged",
         )
     return dict(
-        record, status="UNRESOLVED", detail="No tested candidate passed; originals unchanged"
+        record,
+        status="EXISTING_SUBTITLES_REVIEW" if sidecars else "MISSING_SUBTITLES",
+        detail="Existing English subtitles remain unchanged; verification/repair incomplete"
+        if sidecars
+        else "No eligible English text sidecar or embedded track; no tested candidate passed",
     )

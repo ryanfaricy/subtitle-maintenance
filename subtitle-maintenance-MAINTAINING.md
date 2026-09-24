@@ -30,6 +30,21 @@ existing state locations are preserved. No verification gates were changed.
 
 ## Active architecture
 
+`preservation.py` is an opt-in unchanged-SRT retention policy, not a replacement
+validation gate. It aligns exact normalized words in order with SequenceMatcher
+(autojunk disabled), retaining all subtitle words in the denominator, including
+short cues. Require 95% subtitle-word agreement, 95% matched-word timing within
+the display interval +/-1.5s, 90% audio-word coverage, 200 word matches, 100 unique
+phrase anchors with 80% span, and ten regional 90%/90% checks with 20 words each.
+These are ASR agreement measurements, never calibrated confidence percentages.
+Keep raw originals unchanged and recheck video fingerprint/sidecar hash before
+returning KEPT_EXISTING. Only existing SRTs enter this path. Never pass downloaded
+or retimed candidates through it. Inspect every existing SRT before repair to
+avoid replacing one when another already meets policy. Bump POLICY_VERSION when
+threshold/measurement semantics change; the CLI includes it in the cache key.
+The regular installation/independent-sample gates are unchanged. Failed searches
+now report existing-versus-missing availability separately from verification.
+
 `drift.py` implements opt-in global affine timing correction, not piecewise
 alignment. Fit cue/phrase midpoints using a robust median of separated-pair
 slopes, then a median intercept. Exclude anchor phrases overlapping the five

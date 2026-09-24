@@ -83,6 +83,11 @@ def build_parser():
         "--cache-only", action="store_true", help="Use only existing speech transcripts"
     )
     parser.add_argument("--no-download", action="store_true")
+    parser.add_argument(
+        "--keep-existing-95",
+        action="store_true",
+        help="Keep unchanged SRTs with >=95%% word and timing agreement (1.5s tolerance); skip repair/provider search",
+    )
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--rescan", action="store_true")
     parser.add_argument(
@@ -205,6 +210,11 @@ def main(argv=None):
     config["assume_single_untagged_english"] = args.assume_single_untagged_english
     config["map_episode_titles"] = args.map_episode_titles
     config["allow_drift_correction"] = args.allow_drift_correction
+    config["keep_existing_95"] = args.keep_existing_95
+    if args.keep_existing_95:
+        from .preservation import POLICY_VERSION
+
+        config["preservation_policy_version"] = POLICY_VERSION
     if args.max_downloads is not None:
         config["max_downloads"] = args.max_downloads
     if args.max_candidates is not None:
@@ -311,7 +321,7 @@ def main(argv=None):
                         (str(video), signature),
                     ).fetchone()
                     data = json.loads(old[0]) if old else None
-                    terminal = {"TRUSTED_EMBEDDED", "VERIFIED", "HUMAN_APPROVED"}
+                    terminal = {"TRUSTED_EMBEDDED", "VERIFIED", "HUMAN_APPROVED", "KEPT_EXISTING"}
                     if args.tag_missing_audio_english:
                         from .audio_tags import tag_missing
 

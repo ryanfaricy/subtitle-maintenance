@@ -25,6 +25,49 @@ no speech recognition or provider downloads.
 
 ## Commands
 
+### Preserve mostly aligned existing subtitles (opt-in)
+
+`--keep-existing-95` checks unchanged English SRT sidecars before retiming or
+provider searches. A qualifying file returns `KEPT_EXISTING` in preview AND apply
+mode: no subtitle replacement, timing edit, provider search or download occurs.
+All existing SRTs are checked before any repair; human-approved hashes still win.
+
+The policy measures ordered, exact normalized word agreement with the full ASR
+transcript (including short cues), NOT a probability or guarantee of accuracy:
+
+- At least 95% of subtitle words match the transcript in order.
+- At least 95% of matched word timestamps fall within their cue's display interval
+  or within 1.5 seconds outside it. This is not a cue-onset difference.
+- At least 90% of transcript words are covered, with 200 matched words and 100
+  unique phrase anchors spanning at least 80% of the episode.
+- Each tenth of the episode has at least 20 matched words, 90% word agreement and
+  90% timing agreement; an overall average cannot hide a badly mismatched region.
+- Cue intervals and chronological order must be valid. Comparisons exceeding
+  30,000 words on either side require the ordinary review path.
+
+ASR mistakes, sound descriptions, credits or sparse speech can prevent acceptance.
+This deliberately leaves uncertain cases for review. ASS/VTT preservation scoring
+is not yet supported; their existing verification path remains unchanged. Passing
+this rule never authorizes installation of a downloaded or retimed subtitle.
+Failed preservation checks continue through the existing repair/search workflow;
+use `--no-download` to prohibit provider activity for those files too.
+
+Scores and regional evidence are saved in `preservation_checks` in the JSON report.
+Cached keep decisions are invalidated by file, configuration or policy changes;
+`--rescan` forces another check. Speech recognition may still run when uncached.
+Final unsuccessful searches now distinguish `EXISTING_SUBTITLES_REVIEW` (sidecars
+exist and remain unchanged) from `MISSING_SUBTITLES` (no eligible English text
+subtitles and no candidate passed). Neither is a claim of measured correctness.
+
+```sh
+~/scripts/subtitle-maintain.py '/Volumes/Media/Plex/TV/Mom' \
+  --keep-existing-95 \
+  --map-episode-titles \
+  --assume-single-untagged-english \
+  --allow-drift-correction \
+  --max-downloads 500 --max-candidates 10
+```
+
 ### Verified drift correction (opt-in trial)
 
 `--allow-drift-correction` can repair a consistent playback-speed mismatch in an
