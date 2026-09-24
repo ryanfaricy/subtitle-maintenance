@@ -18,4 +18,21 @@ __pycache__/
 # macOS metadata
 .DS_Store
 *.mp4
-seconv-5.2.0/*
+seconv-5.2.0/
+
+# Local-only configuration, archives, credentials and reports (keep on disk).
+/subtitle-maintenance.json
+/old/
+*.csv
+*.tsv
+*.tar.gz
+*.zip
+*.bundle
+.env
+.env.*
+!.env.example
+*secrets*.json
+*.pem
+*.key
+*.pre-*
+*.bak-*

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import re
+from local_credentials import get_secret
 import warnings
 
 # Suppress urllib3's harmless LibreSSL warning on macOS system Python.
@@ -18,7 +19,7 @@ from collections import defaultdict
 # ------------------------------------------------------------
 
 SONARR = "http://localhost:8989/api/v3"
-API_KEY = "REMOVED_USE_LOCAL_CREDENTIALS"
+API_KEY = get_secret("SONARR_API_KEY")
 
 # Path as macOS sees it
 HOST_EASTENDERS_PATH = Path(

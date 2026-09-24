@@ -1,0 +1,10 @@
+{
+  "python": "python3",
+  "model": "/path/to/local/mlx-model",
+  "max_candidates": 3,
+  "max_downloads": 20,
+  "max_shift": 60,
+  "min_age_minutes": 10,
+  "path_mappings": [],
+  "human_approved_sha256": []
+}

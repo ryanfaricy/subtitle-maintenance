@@ -14,6 +14,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from local_credentials import get_secret
 
 VIDEO = {'.mkv', '.ts', '.mp4', '.m4v'}
 TOKEN = re.compile(r'(?i)\bS(\d{1,4})E(\d+)\b')
@@ -105,15 +106,18 @@ class API:
 def credentials(args):
     url, key = os.environ.get('SONARR_URL'), os.environ.get('SONARR_API_KEY')
     if args.legacy_config:
-        # Read only the two literal settings. NEVER import or execute the old script.
+        # Read literal settings only. The migrated API_KEY call is deliberately
+        # not evaluated; resolve its credential from local storage below.
         tree = ast.parse(Path(args.legacy_config).read_text())
         values = {}
         for node in tree.body:
             if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
                 name = node.targets[0].id
-                if name in ('SONARR', 'API_KEY'):
+                if name in ('SONARR', 'API_KEY') and isinstance(node.value, ast.Constant):
                     values[name] = ast.literal_eval(node.value)
         url, key = url or values.get('SONARR'), key or values.get('API_KEY')
+    if not key:
+        key = get_secret('SONARR_API_KEY')
     if not url or not key:
         raise RuntimeError('Set SONARR_URL and SONARR_API_KEY or supply --legacy-config')
     return API(url, key)
