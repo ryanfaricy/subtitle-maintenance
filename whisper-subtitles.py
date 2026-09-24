@@ -1,4 +1,4 @@
-#!/Users/ryanfaricy/whispermlx-asr-service/.venv/bin/python
+#!/usr/bin/env python3
 
 from pathlib import Path
 import argparse
@@ -12,16 +12,17 @@ import tempfile
 import time
 from datetime import datetime
 
-DEFAULT_ROOT = Path("/Volumes/Media/Plex")
+from script_config import load_config, state_path, tool
+
 ASR_BASE_URL = os.getenv("WHISPER_ASR_URL", "http://127.0.0.1:9001").rstrip("/")
 ASR_MODEL = "large-v3-turbo"
 
-STATE_DIR = Path.home() / "Library/Application Support/WhisperSubtitles"
+STATE_DIR = state_path({}, 'WhisperSubtitles')
 STATE_DB = STATE_DIR / "state.db"
 
-FFMPEG = "/opt/homebrew/bin/ffmpeg"
-FFPROBE = "/opt/homebrew/bin/ffprobe"
-CURL = "/usr/bin/curl"
+FFMPEG = "ffmpeg"
+FFPROBE = "ffprobe"
+CURL = "curl"
 
 VIDEO_EXTENSIONS = {".mkv", ".mp4", ".m4v", ".mov", ".avi", ".ts", ".m2ts", ".webm"}
 SUBTITLE_EXTENSIONS = {".srt", ".ass", ".ssa", ".vtt", ".sub"}
@@ -433,7 +434,11 @@ def process_file(db, video, args):
 
 def main():
     parser = argparse.ArgumentParser(description="Production Whisper subtitle backfill: idempotent, 12-hour grace capable, and watchdog protected.")
-    parser.add_argument("--path", default=str(DEFAULT_ROOT), help="File or directory to scan")
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--path", help="File or directory; defaults to config media_root")
+    parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--service-url")
+    parser.add_argument("--model")
     parser.add_argument("--grace-hours", type=float, default=GRACE_HOURS_DEFAULT)
     parser.add_argument("--max-files", type=int, default=1, help="Maximum transcriptions per run; 0 means unlimited")
     parser.add_argument("--scan-only", action="store_true")
@@ -445,7 +450,22 @@ def main():
     parser.add_argument("--whisper-timeout-minutes", type=float, default=WHISPER_TIMEOUT_SECONDS / 60)
     args = parser.parse_args()
 
-    root = Path(args.path).expanduser()
+    global STATE_DIR, STATE_DB, ASR_BASE_URL, ASR_MODEL, FFMPEG, FFPROBE, CURL
+    try:
+        config = load_config(args.config)
+        whisper = config.get('whisper', {})
+        selected = args.path or config.get('media_root')
+        if not selected:
+            parser.error('Supply --path or set media_root in config')
+        STATE_DIR = args.state_dir or state_path(whisper, 'WhisperSubtitles')
+        STATE_DIR = STATE_DIR.expanduser()
+        STATE_DB = STATE_DIR / 'state.db'
+        ASR_BASE_URL = (args.service_url or os.getenv('WHISPER_ASR_URL') or whisper.get('service_url') or 'http://127.0.0.1:9001').rstrip('/')
+        ASR_MODEL = args.model or whisper.get('model', 'large-v3-turbo')
+        FFMPEG, FFPROBE, CURL = (tool(config, name) for name in ('ffmpeg', 'ffprobe', 'curl'))
+    except ValueError as e:
+        parser.error(str(e))
+    root = Path(selected).expanduser()
     if not root.exists():
         log(f"Media path unavailable: {root}")
         return 0

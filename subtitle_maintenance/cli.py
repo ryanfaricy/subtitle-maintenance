@@ -9,6 +9,7 @@ import sys
 import time
 from . import __version__,media
 from .common import atomic_json,digest,fingerprint,install
+from script_config import load_config, state_path
 from .providers import Provider
 from .workflow import process
 
@@ -27,8 +28,8 @@ def selection_lines(data):
 def main():
     p=argparse.ArgumentParser(description='Conservative English subtitle maintenance. Preview by default.')
     p.add_argument('paths',nargs='*',type=Path)
-    p.add_argument('--config',type=Path,default=Path.home()/'scripts/subtitle-maintenance.json')
-    p.add_argument('--state-dir',type=Path,default=Path.home()/'Library/Application Support/SubtitleMaintenance')
+    p.add_argument('--config',type=Path,help='JSON settings (default: beside the scripts; SUBTITLE_MAINTENANCE_CONFIG overrides)')
+    p.add_argument('--state-dir',type=Path,help='Override config state_dir')
     p.add_argument('--apply',action='store_true')
     p.add_argument('--scan-only',action='store_true',help='Inventory only: no provider downloads or speech transcription')
     p.add_argument('--audit', choices=['coverage','defaults'], help='Read-only metadata audit; no transcription/downloads')
@@ -58,7 +59,13 @@ def main():
     if a.restore_quarantine and a.paths:p.error('--restore-quarantine cannot be combined with paths')
     if a.restore and (a.paths or a.scan_only):p.error('--restore cannot be combined with paths or --scan-only')
     if a.scan_only and a.apply:p.error('--scan-only cannot be combined with --apply')
-    config=json.loads(a.config.expanduser().read_text()) if a.config.expanduser().exists() else {}
+    try:config=load_config(a.config)
+    except ValueError as e:p.error(str(e))
+    from .common import configure_tools
+    configure_tools(config)
+    a.state_dir=a.state_dir or state_path(config)
+    if not a.paths and not (a.restore or a.restore_quarantine) and config.get('media_root'):
+        a.paths=[Path(config['media_root'])]
     config.setdefault('python',sys.executable);config.setdefault('model','')
     config['cache_only']=a.cache_only
     config['assume_single_untagged_english']=a.assume_single_untagged_english

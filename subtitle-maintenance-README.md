@@ -1,5 +1,15 @@
 # Subtitle Maintain
 
+## Shared configuration and portable installation
+
+See [README.md](README.md) for clone setup and shared settings. The loader now
+finds `subtitle-maintenance.json` beside the scripts, supports `--config` and
+`SUBTITLE_MAINTENANCE_CONFIG`, and resolves relative host paths against that file.
+Media/show roots, standalone Whisper tools/service, Sonarr paths and Subarr
+backup settings no longer require source edits. Private installed settings and
+existing state locations are preserved. No verification gates were changed.
+
+
 One entry point for conservative English subtitle maintenance. Preview is the
 default. Preview may download candidates and transcribe audio into the state
 folder, but never replaces media. `--scan-only` is an inexpensive inventory with

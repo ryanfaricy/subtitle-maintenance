@@ -18,16 +18,18 @@ from collections import defaultdict
 # CONFIG
 # ------------------------------------------------------------
 
-SONARR = "http://localhost:8989/api/v3"
+from script_config import load_config, show_path
+CONFIG = load_config()
+SONARR = CONFIG.get('sonarr', {}).get('url', 'http://localhost:8989/api/v3')
 API_KEY = get_secret("SONARR_API_KEY")
 
 # Path as macOS sees it
-HOST_EASTENDERS_PATH = Path(
-    "/Volumes/Media/Plex/TV/EastEnders"
-)
+HOST_EASTENDERS_PATH = show_path(CONFIG, 'EastEnders')
 
 # Same path as Sonarr's Docker container sees it
-SONARR_EASTENDERS_PATH = "/data/Plex/TV/EastEnders"
+SONARR_EASTENDERS_PATH = CONFIG.get('sonarr', {}).get('eastenders_root')
+if not SONARR_EASTENDERS_PATH:
+    raise ValueError('Set sonarr.eastenders_root to the container EastEnders folder in config')
 
 # Start SAFE.
 # True  = print what would happen, change nothing
@@ -78,7 +80,7 @@ def sonarr_post(endpoint, payload):
 def host_to_sonarr_path(host_path):
     """
     Convert:
-      /Volumes/Media/Plex/TV/EastEnders/Season 2026/file.mkv
+      /path/to/media/TV/EastEnders/Season 2026/file.mkv
 
     into:
       /data/Plex/TV/EastEnders/Season 2026/file.mkv

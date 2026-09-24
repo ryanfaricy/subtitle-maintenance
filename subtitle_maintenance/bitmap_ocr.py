@@ -22,6 +22,8 @@ import tempfile
 from pathlib import Path
 
 
+FFPROBE = "ffprobe"
+
 VIDEO_EXTENSIONS = {".mkv", ".mka", ".mks", ".mp4", ".m4v", ".mov", ".avi", ".ts", ".m2ts"}
 MATROSKA_EXTENSIONS = {".mkv", ".mka", ".mks"}
 BITMAP_CODECS = {
@@ -71,6 +73,7 @@ TESSERACT_LANGUAGES = {
 
 
 def run(command: list[str], *, capture: bool = True) -> subprocess.CompletedProcess[str]:
+    command = [FFPROBE if str(x) == "ffprobe" and i == 0 else x for i, x in enumerate(command)]
     return subprocess.run(
         command,
         text=True,
@@ -829,6 +832,7 @@ def main() -> int:
         "--limit", type=int, default=0,
         help="Stop after this many video files (0 means no limit). Useful for testing."
     )
+    parser.add_argument("--ffprobe", default="ffprobe", help="ffprobe executable")
     parser.add_argument("--seconv", help="Path to Subtitle Edit's seconv executable")
     parser.add_argument("--mkvmerge", help="Path to the mkvmerge executable")
     parser.add_argument(
@@ -898,14 +902,16 @@ def main() -> int:
         if not allowed_languages:
             parser.error("--languages must contain at least one language or 'all'")
 
-    if not shutil.which("ffprobe"):
+    global FFPROBE
+    FFPROBE = args.ffprobe
+    if not shutil.which(FFPROBE):
         parser.error("ffprobe is required")
 
     if args.audit_report:
         report = args.audit_report.expanduser().resolve()
         return write_audit(library, report, args.limit)
 
-    bundled_seconv = Path.home() / "scripts/seconv-5.2.0/seconv"
+    bundled_seconv = Path(__file__).resolve().parent.parent / "seconv-5.2.0/seconv"
     seconv = args.seconv or shutil.which("seconv") or (str(bundled_seconv) if bundled_seconv.is_file() else None)
     mkvmerge = args.mkvmerge or shutil.which("mkvmerge")
     if seconv:

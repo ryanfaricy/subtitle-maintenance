@@ -64,7 +64,10 @@ def ocr(video,info,config,state,apply):
         if digest(copy)!=original_sha:raise ValueError('OCR input copy verification failed')
         print('    OCR on isolated copy; original is not touched during conversion',flush=True)
         worker=Path(__file__).with_name('bitmap_ocr.py')
-        run([config['python'],worker,copy,'--languages','eng','--apply'],7200)
+        command=[config['python'],worker,copy,'--languages','eng','--apply']
+        for name in ('seconv','mkvmerge','ffprobe'):
+            if config.get('tools',{}).get(name):command.extend(['--'+name,config['tools'][name]])
+        run(command,7200)
         after=media.inventory(copy)
         oldstreams=info['data']['streams'];newstreams=after['data']['streams']
         from collections import Counter

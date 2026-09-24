@@ -27,7 +27,17 @@ def atomic_json(path,data):
     finally:
         if os.path.exists(name):os.unlink(name)
 
+_tool_config = {}
+
+def configure_tools(config):
+    global _tool_config
+    _tool_config = {'tools': dict(config.get('tools', {}))}
+
 def run(command,timeout=120):
+    from script_config import tool
+    command = list(command)
+    if str(command[0]) in _tool_config.get('tools', {}):
+        command[0] = tool(_tool_config, str(command[0]))
     p=subprocess.Popen([str(x) for x in command],stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
     try:out,err=p.communicate(timeout=timeout)

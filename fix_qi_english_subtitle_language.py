@@ -18,7 +18,9 @@ import sys
 from pathlib import Path
 
 
-QI_ROOT = Path("/Volumes/Media/Plex/TV/QI").resolve()
+from script_config import load_config, show_path
+
+QI_ROOT = None
 TEXT_CODEC_MARKERS = ("subrip", "srt", "substationalpha", "ass", "ssa", "webvtt")
 
 
@@ -77,7 +79,12 @@ def main() -> int:
         "--apply", action="store_true",
         help="Apply language metadata changes. Without this flag, preview only.",
     )
+    parser.add_argument('--config', type=Path)
+    parser.add_argument('--qi-root', type=Path, help='Restrict the audit to this QI folder')
     args = parser.parse_args()
+    global QI_ROOT
+    try:QI_ROOT = (args.qi_root or show_path(load_config(args.config), 'QI')).expanduser().resolve()
+    except ValueError as e:parser.error(str(e))
 
     report = args.report.expanduser().resolve()
     if not report.is_file():

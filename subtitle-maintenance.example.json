@@ -6,5 +6,33 @@
   "max_shift": 60,
   "min_age_minutes": 10,
   "path_mappings": [],
-  "human_approved_sha256": []
+  "human_approved_sha256": [],
+  "media_root": "/path/to/media",
+  "tools": {
+    "ffmpeg": "ffmpeg",
+    "ffprobe": "ffprobe",
+    "mkvmerge": "mkvmerge",
+    "mkvpropedit": "mkvpropedit",
+    "curl": "curl",
+    "docker": "docker"
+  },
+  "whisper": {
+    "service_url": "http://127.0.0.1:9001",
+    "model": "large-v3-turbo"
+  },
+  "sonarr": {
+    "url": "http://localhost:8989/api/v3",
+    "host_root": "/path/to/media/TV",
+    "sonarr_root": "/data/TV",
+    "eastenders_root": "/data/TV/EastEnders",
+    "work_dir": "./state/sonarr-import"
+  },
+  "backup": {
+    "container": "subarr",
+    "user": "subarr",
+    "python": "/usr/local/bin/python",
+    "database": "/config/subarr.db",
+    "directory": "/config/backups",
+    "keep": 7
+  }
 }

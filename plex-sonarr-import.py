@@ -103,8 +103,12 @@ class API:
         raise RuntimeError('Command timed out; inspect Sonarr before retry: ' + str(command['id']))
 
 
+from script_config import load_config
+
 def credentials(args):
-    url, key = os.environ.get('SONARR_URL'), os.environ.get('SONARR_API_KEY')
+    config = load_config(getattr(args, 'config', None))
+    url = os.environ.get('SONARR_URL')
+    key = os.environ.get('SONARR_API_KEY')
     if args.legacy_config:
         # Read literal settings only. The migrated API_KEY call is deliberately
         # not evaluated; resolve its credential from local storage below.
@@ -116,6 +120,7 @@ def credentials(args):
                 if name in ('SONARR', 'API_KEY') and isinstance(node.value, ast.Constant):
                     values[name] = ast.literal_eval(node.value)
         url, key = url or values.get('SONARR'), key or values.get('API_KEY')
+    url = url or config.get('sonarr', {}).get('url')
     if not key:
         key = get_secret('SONARR_API_KEY')
     if not url or not key:
@@ -128,13 +133,20 @@ def main(argv=None):
     parser.add_argument('--series', action='append', required=True, help='Exact Sonarr title; repeatable')
     parser.add_argument('--year-numbered-series', action='append', default=[])
     parser.add_argument('--date-numbered-series', action='append', default=[], help='Only for verified ORIGINAL air-date filenames')
-    parser.add_argument('--host-root', type=Path, required=True)
-    parser.add_argument('--sonarr-root', required=True)
+    parser.add_argument('--config', type=Path)
+    parser.add_argument('--host-root', type=Path)
+    parser.add_argument('--sonarr-root')
     parser.add_argument('--legacy-config', type=Path)
-    parser.add_argument('--work-dir', type=Path, required=True, help='Lock and append-only import journal')
+    parser.add_argument('--work-dir', type=Path, help='Lock and append-only import journal')
     parser.add_argument('--min-age-minutes', type=float, default=60)
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args(argv)
+    try:settings = load_config(args.config).get('sonarr', {})
+    except ValueError as e:parser.error(str(e))
+    for option in ('host_root', 'sonarr_root', 'work_dir'):
+        value = getattr(args, option) or settings.get(option)
+        if not value:parser.error('Supply --'+option.replace('_','-')+' or sonarr.'+option+' in config')
+        setattr(args, option, Path(value).expanduser() if option != 'sonarr_root' else value)
     if args.min_age_minutes < 60:
         parser.error('Recording grace period must be at least 60 minutes')
     args.work_dir.mkdir(parents=True, exist_ok=True)

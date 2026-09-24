@@ -1,5 +1,15 @@
 # Active script context — 2026-09-23
 
+## Shared configuration and portable installation
+
+See [README.md](README.md) for clone setup and shared settings. The loader now
+finds `subtitle-maintenance.json` beside the scripts, supports `--config` and
+`SUBTITLE_MAINTENANCE_CONFIG`, and resolves relative host paths against that file.
+Media/show roots, standalone Whisper tools/service, Sonarr paths and Subarr
+backup settings no longer require source edits. Private installed settings and
+existing state locations are preserved. No verification gates were changed.
+
+
 Ryan wants full-dialogue English subtitles for Tunarr/Plex. Embedded English text
 is trusted by policy; embedded bitmap can be OCRed to text while retaining bitmap.
 Sidecars need dialogue/timing verification; wrong-cut QI vs QI XL subtitles cannot
