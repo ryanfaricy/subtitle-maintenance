@@ -165,3 +165,10 @@ New subprocesses require stdin isolation, bounded timeout and resource limits.
 New archive batches need exact names, SHA256 manifest and caller checks. Restore
 archived scripts by copying, not deleting their archival originals. Older groups
 have cross-dependencies: restore a coherent group and review paths before use.
+
+## Executable path identity
+
+Config expansion must preserve executable symlinks, especially virtualenv Python.
+Resolving the Python symlink to its base installation bypasses the environment's
+packages and breaks uncached native transcription. The configuration regression
+test launches an isolated virtualenv Python and checks its actual runtime prefix.

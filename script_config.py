@@ -56,14 +56,16 @@ def load_config(filename=None):
                 raise ValueError(f"Config {key} must be a nonempty string")
 
     # Resolve known filesystem settings relative to the config, never the caller's cwd.
-    def expand(section, keys):
+    def expand(section, keys, *, preserve_symlinks=False):
         for key in keys:
             if key in section and section[key] is not None:
                 value = section[key]
                 if not isinstance(value, str) or not value.strip():
                     raise ValueError(f"Config {key} must be a nonempty path string")
                 p = Path(value).expanduser()
-                section[key] = str((path.resolve().parent / p).resolve())
+                expanded = path.resolve().parent / p
+                # A virtualenv executable symlink must retain its environment identity.
+                section[key] = str(expanded.absolute() if preserve_symlinks else expanded.resolve())
 
     expand(config, ("media_root", "state_dir", "legacy_transcripts", "bazarr_database"))
     expand(config.get("whisper", {}), ("state_dir",))
@@ -79,7 +81,7 @@ def load_config(filename=None):
             if value is not None and (not isinstance(value, str) or not value.strip()):
                 raise ValueError(f"Config {key} must be a nonempty string")
             if value and (value.startswith(("~", ".", "/"))):
-                expand(section, (key,))
+                expand(section, (key,), preserve_symlinks=(key != "model"))
     return config
 
 

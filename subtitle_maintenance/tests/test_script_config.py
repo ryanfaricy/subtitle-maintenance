@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import venv
 from pathlib import Path
 from unittest.mock import patch
 
@@ -39,6 +40,28 @@ class ConfigurationTests(unittest.TestCase):
                 self.assertEqual(settings.load_config(), {})
                 with self.assertRaisesRegex(ValueError, "Cannot read config"):
                     settings.load_config(default)
+
+    def test_virtualenv_python_keeps_its_environment(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d).resolve()
+            environment = root / "runtime"
+            venv.EnvBuilder(with_pip=False, symlinks=True).create(environment)
+            executable = environment / "bin/python"
+            config = root / "config.json"
+            for value in (str(executable), "./runtime/bin/python"):
+                with self.subTest(value=value):
+                    config.write_text(json.dumps({"python": value, "tools": {"ffmpeg": value}}))
+                    loaded = settings.load_config(config)
+                    self.assertEqual(loaded["python"], str(executable))
+                    self.assertEqual(loaded["tools"]["ffmpeg"], str(executable))
+                    result = subprocess.run(
+                        [loaded["python"], "-c", "import sys; print(sys.prefix)"],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=30,
+                    )
+                    self.assertEqual(Path(result.stdout.strip()).resolve(), environment)
 
     def test_invalid_config_fails_without_echoing_contents(self):
         with tempfile.TemporaryDirectory() as d:
