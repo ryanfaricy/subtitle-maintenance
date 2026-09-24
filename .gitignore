@@ -36,3 +36,11 @@ seconv-5.2.0/
 *.key
 *.pre-*
 *.bak-*
+
+# Development and packaging
+.venv/
+.ruff_cache/
+.pytest_cache/
+build/
+dist/
+*.egg-info/

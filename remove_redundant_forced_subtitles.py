@@ -19,7 +19,6 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-
 FIELDS = ["video", "action", "forced_track", "full_track", "details"]
 
 
@@ -29,8 +28,11 @@ class NotNeededError(ValueError):
 
 def identify(path: Path, mkvmerge: str) -> dict:
     result = subprocess.run(
-        [mkvmerge, "-J", str(path)], text=True, capture_output=True,
-        check=True, timeout=120,
+        [mkvmerge, "-J", str(path)],
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=120,
     )
     return json.loads(result.stdout)
 
@@ -59,15 +61,20 @@ def is_text_subtitle(track: dict) -> bool:
 
 def signature(track: dict) -> tuple:
     return (
-        track.get("type"), track.get("codec"), prop(track, "language", "und"),
-        prop(track, "language_ietf", ""), prop(track, "track_name", ""),
+        track.get("type"),
+        track.get("codec"),
+        prop(track, "language", "und"),
+        prop(track, "language_ietf", ""),
+        prop(track, "track_name", ""),
         bool(prop(track, "default_track", False)),
         bool(prop(track, "forced_track", False)),
         bool(prop(track, "hearing_impaired", False)),
     )
 
 
-def validate_candidate(path: Path, forced_id: int, full_id: int, payload: dict) -> tuple[dict, dict]:
+def validate_candidate(
+    path: Path, forced_id: int, full_id: int, payload: dict
+) -> tuple[dict, dict]:
     tracks = payload.get("tracks", [])
     by_id = {int(track["id"]): track for track in tracks}
     if forced_id not in by_id:
@@ -87,7 +94,8 @@ def validate_candidate(path: Path, forced_id: int, full_id: int, payload: dict) 
     if forced_id >= full_id:
         raise ValueError("forced track no longer precedes the full track")
     earlier_full = [
-        track for track in tracks
+        track
+        for track in tracks
         if int(track["id"]) < forced_id
         and track.get("type") == "subtitles"
         and is_english(track)
@@ -104,8 +112,7 @@ def validate_candidate(path: Path, forced_id: int, full_id: int, payload: dict) 
 
 def verify_output(before: dict, after: dict, removed_id: int) -> None:
     expected = Counter(
-        signature(track) for track in before.get("tracks", [])
-        if int(track["id"]) != removed_id
+        signature(track) for track in before.get("tracks", []) if int(track["id"]) != removed_id
     )
     actual = Counter(signature(track) for track in after.get("tracks", []))
     if actual != expected:
@@ -146,12 +153,15 @@ def load_plan(report: Path) -> tuple[list[dict], Counter[str]]:
 
 def remux(path: Path, forced_id: int, before: dict, mkvmerge: str) -> None:
     subtitle_ids = [
-        int(track["id"]) for track in before.get("tracks", [])
+        int(track["id"])
+        for track in before.get("tracks", [])
         if track.get("type") == "subtitles" and int(track["id"]) != forced_id
     ]
     stat = path.stat()
     temp_fd, temp_name = tempfile.mkstemp(
-        prefix=f".{path.stem}.remove-forced-", suffix=".mkv", dir=path.parent,
+        prefix=f".{path.stem}.remove-forced-",
+        suffix=".mkv",
+        dir=path.parent,
     )
     os.close(temp_fd)
     temp = Path(temp_name)
@@ -177,11 +187,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Preview or apply removal of high-confidence redundant forced MKV subtitle tracks."
     )
-    parser.add_argument("--audit", type=Path, required=True, help="Audit CSV produced by audit_redundant_forced_subtitles.py")
-    parser.add_argument("--report", type=Path, required=True, help="Write the removal preview/result CSV here")
-    parser.add_argument("--apply", action="store_true", help="Actually remux and replace verified files")
+    parser.add_argument(
+        "--audit",
+        type=Path,
+        required=True,
+        help="Audit CSV produced by audit_redundant_forced_subtitles.py",
+    )
+    parser.add_argument(
+        "--report", type=Path, required=True, help="Write the removal preview/result CSV here"
+    )
+    parser.add_argument(
+        "--apply", action="store_true", help="Actually remux and replace verified files"
+    )
     parser.add_argument("--limit", type=int, default=0, help="Process at most N eligible files")
-    parser.add_argument("--mkvmerge", default="mkvmerge", help="mkvmerge executable (default: mkvmerge)")
+    parser.add_argument(
+        "--mkvmerge", default="mkvmerge", help="mkvmerge executable (default: mkvmerge)"
+    )
     args = parser.parse_args()
 
     audit = args.audit.expanduser().resolve()
@@ -196,7 +217,7 @@ def main() -> int:
 
     plan, skipped = load_plan(audit)
     if args.limit:
-        plan = plan[:args.limit]
+        plan = plan[: args.limit]
     report.parent.mkdir(parents=True, exist_ok=True)
     counts: Counter[str] = Counter()
     audit_mtime = audit.stat().st_mtime_ns
@@ -234,20 +255,28 @@ def main() -> int:
                     print(f"[{number}/{len(plan)}] WOULD REMOVE: {path} :: {details}", flush=True)
                     action = "WOULD_REMOVE"
                 counts[action] += 1
-                writer.writerow({
-                    "video": str(path), "action": action,
-                    "forced_track": forced_id, "full_track": full_id,
-                    "details": details,
-                })
+                writer.writerow(
+                    {
+                        "video": str(path),
+                        "action": action,
+                        "forced_track": forced_id,
+                        "full_track": full_id,
+                        "details": details,
+                    }
+                )
             except NotNeededError as error:
                 action = "SKIPPED_NOT_NEEDED"
                 counts[action] += 1
                 print(f"[{number}/{len(plan)}] NOT NEEDED: {path} :: {error}", flush=True)
-                writer.writerow({
-                    "video": str(path), "action": action,
-                    "forced_track": forced_id, "full_track": full_id,
-                    "details": str(error),
-                })
+                writer.writerow(
+                    {
+                        "video": str(path),
+                        "action": action,
+                        "forced_track": forced_id,
+                        "full_track": full_id,
+                        "details": str(error),
+                    }
+                )
             except (OSError, ValueError, subprocess.SubprocessError, json.JSONDecodeError) as error:
                 action = "SKIPPED_VALIDATION_ERROR"
                 counts[action] += 1
@@ -255,15 +284,21 @@ def main() -> int:
                 if isinstance(error, subprocess.CalledProcessError) and error.stderr:
                     detail = error.stderr.strip().splitlines()[-1]
                 print(f"[{number}/{len(plan)}] SKIP: {path} :: {detail}", flush=True)
-                writer.writerow({
-                    "video": str(path), "action": action,
-                    "forced_track": forced_id, "full_track": full_id,
-                    "details": detail,
-                })
+                writer.writerow(
+                    {
+                        "video": str(path),
+                        "action": action,
+                        "forced_track": forced_id,
+                        "full_track": full_id,
+                        "details": detail,
+                    }
+                )
 
     print("Summary")
     for action in (
-        "WOULD_REMOVE", "VERIFIED_AND_REPLACED", "SKIPPED_NOT_NEEDED",
+        "WOULD_REMOVE",
+        "VERIFIED_AND_REPLACED",
+        "SKIPPED_NOT_NEEDED",
         "SKIPPED_VALIDATION_ERROR",
     ):
         print(f"  {action}: {counts[action]}")

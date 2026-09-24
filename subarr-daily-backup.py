@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Create a verified Subarr backup using shared non-secret configuration."""
+
 import argparse
-from pathlib import Path
 import subprocess
+import sys
+from pathlib import Path
+
 from script_config import load_config, tool
 
 PAYLOAD = """
@@ -50,30 +53,53 @@ print(json.dumps(result, sort_keys=True))
 """
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path)
-    args = parser.parse_args()
+    parser.add_argument("--config", type=Path)
+    parser.add_argument(
+        "--apply", action="store_true", help="Create a backup; otherwise print a preview"
+    )
+    arguments = sys.argv[1:] if argv is None else argv
+    if not arguments:
+        parser.print_help()
+        return 0
+    args = parser.parse_args(arguments)
     try:
         config = load_config(args.config)
-        docker = tool(config, 'docker')
-        settings = config.get('backup', {})
-        keep = settings.get('keep', 7)
+        docker = tool(config, "docker")
+        settings = config.get("backup", {})
+        keep = settings.get("keep", 7)
         if type(keep) is not int or keep < 1:
-            raise ValueError('backup.keep must be a positive integer')
+            raise ValueError("backup.keep must be a positive integer")
     except ValueError as e:
         parser.error(str(e))
-    container = settings.get('container', 'subarr')
-    check = subprocess.run([docker, 'inspect', '-f', '{{.State.Running}}', container],
-                           capture_output=True, text=True, timeout=30)
-    if check.returncode or check.stdout.strip() != 'true':
-        parser.error('Subarr container is not running; backup not created')
-    command = [docker, 'exec', '--user', settings.get('user', 'subarr'), container,
-               settings.get('python', '/usr/local/bin/python'), '-c', PAYLOAD,
-               settings.get('database', '/config/subarr.db'),
-               settings.get('directory', '/config/backups'), str(keep)]
+    container = settings.get("container", "subarr")
+    if not args.apply:
+        print(f"Would back up container {container}; use --apply to create a verified backup.")
+        return 0
+    check = subprocess.run(
+        [docker, "inspect", "-f", "{{.State.Running}}", container],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if check.returncode or check.stdout.strip() != "true":
+        parser.error("Subarr container is not running; backup not created")
+    command = [
+        docker,
+        "exec",
+        "--user",
+        settings.get("user", "subarr"),
+        container,
+        settings.get("python", "/usr/local/bin/python"),
+        "-c",
+        PAYLOAD,
+        settings.get("database", "/config/subarr.db"),
+        settings.get("directory", "/config/backups"),
+        str(keep),
+    ]
     return subprocess.run(command, timeout=600).returncode
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())

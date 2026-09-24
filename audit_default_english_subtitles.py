@@ -16,20 +16,53 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-
 VIDEO_EXTENSIONS = {
-    ".3gp", ".asf", ".avi", ".divx", ".flv", ".m2ts", ".m4v", ".mkv",
-    ".mov", ".mp4", ".mpeg", ".mpg", ".mts", ".ogm", ".ogv", ".rm",
-    ".rmvb", ".ts", ".vob", ".webm", ".wmv",
+    ".3gp",
+    ".asf",
+    ".avi",
+    ".divx",
+    ".flv",
+    ".m2ts",
+    ".m4v",
+    ".mkv",
+    ".mov",
+    ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".mts",
+    ".ogm",
+    ".ogv",
+    ".rm",
+    ".rmvb",
+    ".ts",
+    ".vob",
+    ".webm",
+    ".wmv",
 }
 TEXT_CODECS = {
-    "ass", "dvb_teletext", "eia_608", "eia_708", "hdmv_text_subtitle",
-    "microdvd", "mov_text", "mpl2", "realtext", "sami", "srt", "ssa",
-    "subrip", "text", "ttml", "webvtt",
+    "ass",
+    "dvb_teletext",
+    "eia_608",
+    "eia_708",
+    "hdmv_text_subtitle",
+    "microdvd",
+    "mov_text",
+    "mpl2",
+    "realtext",
+    "sami",
+    "srt",
+    "ssa",
+    "subrip",
+    "text",
+    "ttml",
+    "webvtt",
 }
 ENGLISH_TAGS = {"en", "eng", "english"}
 FIELDNAMES = [
-    "video", "status", "english_subtitle_streams", "all_subtitle_streams",
+    "video",
+    "status",
+    "english_subtitle_streams",
+    "all_subtitle_streams",
     "error",
 ]
 
@@ -61,9 +94,7 @@ def disposition(stream: dict, name: str) -> bool:
 
 
 def is_forced(stream: dict) -> bool:
-    return disposition(stream, "forced") or "forced" in title_words(
-        stream_tag(stream, "title")
-    )
+    return disposition(stream, "forced") or "forced" in title_words(stream_tag(stream, "title"))
 
 
 def is_text(stream: dict) -> bool:
@@ -73,11 +104,17 @@ def is_text(stream: dict) -> bool:
 def probe(path: Path) -> list[dict]:
     result = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-select_streams", "s",
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "s",
             "-show_entries",
             "stream=index,codec_name:stream_tags=language,title:"
             "stream_disposition=default,forced,hearing_impaired",
-            "-of", "json", str(path),
+            "-of",
+            "json",
+            str(path),
         ],
         text=True,
         capture_output=True,
@@ -110,7 +147,8 @@ def classify(streams: list[dict]) -> str:
     english = [stream for stream in streams if is_english(stream)]
     english_text = [stream for stream in english if is_text(stream)]
     qualifying = [
-        stream for stream in english_text
+        stream
+        for stream in english_text
         if disposition(stream, "default") and not is_forced(stream)
     ]
     if qualifying:
@@ -143,8 +181,7 @@ def videos_under(paths: list[Path]):
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Read-only audit for videos lacking a default, non-forced English "
-            "text subtitle stream."
+            "Read-only audit for videos lacking a default, non-forced English text subtitle stream."
         )
     )
     parser.add_argument(
@@ -153,7 +190,9 @@ def main() -> int:
     parser.add_argument("--report", type=Path, required=True, help="CSV report path")
     parser.add_argument("--limit", type=int, default=0, help="Inspect at most N videos")
     parser.add_argument(
-        "--progress-every", type=int, default=100,
+        "--progress-every",
+        type=int,
+        default=100,
         help="Print progress every N videos (default: 100)",
     )
     args = parser.parse_args()
@@ -188,23 +227,29 @@ def main() -> int:
                 streams = probe(video)
                 status = classify(streams)
                 english = [stream for stream in streams if is_english(stream)]
-                writer.writerow({
-                    "video": str(video),
-                    "status": status,
-                    "english_subtitle_streams": "; ".join(map(describe, english)),
-                    "all_subtitle_streams": "; ".join(map(describe, streams)),
-                    "error": "",
-                })
+                writer.writerow(
+                    {
+                        "video": str(video),
+                        "status": status,
+                        "english_subtitle_streams": "; ".join(map(describe, english)),
+                        "all_subtitle_streams": "; ".join(map(describe, streams)),
+                        "error": "",
+                    }
+                )
             except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as error:
                 status = "PROBE_ERROR"
                 detail = str(error)
                 if isinstance(error, subprocess.CalledProcessError) and error.stderr:
                     detail = error.stderr.strip().splitlines()[-1]
-                writer.writerow({
-                    "video": str(video), "status": status,
-                    "english_subtitle_streams": "", "all_subtitle_streams": "",
-                    "error": detail,
-                })
+                writer.writerow(
+                    {
+                        "video": str(video),
+                        "status": status,
+                        "english_subtitle_streams": "",
+                        "all_subtitle_streams": "",
+                        "error": detail,
+                    }
+                )
             counts[status] += 1
             if args.limit and inspected >= args.limit:
                 break

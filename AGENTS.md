@@ -10,8 +10,9 @@ Read `SCRIPT_CONTEXT.md`, `subtitle-maintenance-README.md` and
   verification gates to claim a successful repair. No automatic correctness is 100%.
 - Language ambiguity, forced-only content and wrong cuts must remain review cases.
 - Keep cleanup opt-in; do not silently add default changes or embedded-track deletion.
-- No hardcoded credentials or secret logging. Do not import `eastenders-fix.py`:
-  it has module-scope mutations and legacy sensitive configuration.
+- No hardcoded credentials or secret logging. Imports must remain inert.
+  EastEnders and Whisper require explicit --apply; EastEnders deletion also
+  requires --cleanup-redundant. Bare entry points must not process media.
 - Tests: from ~/scripts run `python3 -m unittest discover -s subtitle_maintenance/tests -v`.
 - Synchronize installed and development copies. Runtime deps include ffmpeg,
   MKVToolNix, Subtitle Edit, the configured MLX runtime and provider bridge requests.
@@ -46,3 +47,10 @@ validated change with a local Git commit using Conventional Commit style, e.g.
   Later pushes must check all newly outgoing commits for the same risks.
 - Report the commit hash and push result honestly. If blocked, retain the local
   commit and explain why. Preserve this policy when regenerating this file.
+
+## Quality checks
+
+Run `ruff check .`, `ruff format --check .`, the unittest suite and `python -m build`.
+Use synthetic fixtures and test preview/apply separation for mutation changes.
+The one-time user-requested history consolidation is an explicit exception to the
+normal no-rewrite policy; future history changes still require explicit direction.

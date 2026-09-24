@@ -1,12 +1,17 @@
 # Subtitle maintenance
 
+[![Checks](https://github.com/ryanfaricy/subtitle-maintenance/actions/workflows/checks.yml/badge.svg)](https://github.com/ryanfaricy/subtitle-maintenance/actions/workflows/checks.yml)
+
+MIT licensed • Python 3.10+ • macOS/Linux • preview-first
+
 Conservative English subtitle maintenance, audits, and related media utilities.
 Preview is the default for the main tool. See the [full workflow guide](subtitle-maintenance-README.md)
 for verification behavior and apply/restore commands.
 
 ## Set up a clone
 
-1. Clone or fork this repository into any folder.
+1. Clone or fork this repository into any folder. The main CLI is supported;
+   QI/EastEnders scripts are specialist utilities with show-specific assumptions.
 2. Use Python 3.10 or newer. Install ffmpeg/ffprobe and MKVToolNix on your `PATH`.
    OCR additionally needs Subtitle Edit's `seconv`. Native MLX transcription
    requires a compatible Apple Silicon runtime and model; configuring paths
@@ -14,13 +19,29 @@ for verification behavior and apply/restore commands.
    `PyYAML` in the configured Python, or the documented Bazarr bridge.
 3. Copy `subtitle-maintenance.example.json` to `subtitle-maintenance.json`.
    Set `media_root`, `python`, and `model`. Configure only the integrations you use.
-4. Run a read-only inventory:
+4. Install the command in a virtual environment and check setup:
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+subtitle-maintain --doctor
+```
+
+Use `'.[providers]'` instead of `.` for standalone provider dependencies, or
+`'.[mlx]'` for optional Apple Silicon transcription dependencies. The main CLI
+and metadata logic use the Python standard library; external media tools are
+installed separately. Linux supports the core/service-based paths; Windows is
+not currently supported. `doctor` checks local availability, not real provider,
+OCR or model interoperability.
+
+5. Run a read-only inventory:
 
 ```sh
 python3 subtitle-maintain.py --scan-only
 ```
 
-A normal preview (`python3 subtitle-maintain.py`) can download subtitle candidates
+A repair preview (`subtitle-maintain /path/to/media`) can download subtitle candidates
 and transcribe into the state folder. Use `--scan-only` for the initial inventory.
 The local config is ignored by Git. Never put credentials in the example or local
 settings; use the existing environment/owner-only secrets mechanism described in
@@ -30,9 +51,13 @@ settings; use the existing environment/owner-only secrets mechanism described in
 
 `script_config.py` is the standard-library-only loader. Config selection is:
 `--config /path/settings.json`, then `SUBTITLE_MAINTENANCE_CONFIG`, then
-`subtitle-maintenance.json` beside the scripts. An explicit missing or malformed
+`subtitle-maintenance.json` beside the scripts, then
+`$XDG_CONFIG_HOME/subtitle-maintenance/config.json` (default `~/.config/subtitle-maintenance/config.json`).
+For a wheel install, use `--config` or the user config location. An explicit missing or malformed
 config is an error. Missing default config allows commands with explicit inputs.
-Supported command-line settings override JSON. `~` is expanded in host paths;
+Unknown keys, invalid types/ranges, and config-based mutation flags are rejected.
+Use the optional `policy` section for limits; flat legacy keys still work but
+duplicate definitions are an error. Supported command-line settings override JSON. `~` is expanded in host paths;
 relative host paths are relative to the config file. Prefix relative executable
 or local model paths with `./`; bare executable names are looked up on `PATH`.
 Container paths are kept exactly as supplied.
@@ -68,7 +93,7 @@ python3 subtitle-maintain.py /another/library --config /path/settings.json --sca
 python3 whisper-subtitles.py --config /path/settings.json --path /another/library --dry-run
 python3 fix_qi_english_subtitle_language.py --help
 python3 plex-sonarr-import.py --help
-python3 subarr-daily-backup.py --config /path/settings.json
+python3 subarr-daily-backup.py --config /path/settings.json --apply
 ```
 
 The existing `subarr-daily-backup.sh` entry point forwards to the Python helper,
@@ -76,10 +101,29 @@ so scheduled callers can retain its filename. Backup paths in JSON are container
 paths. The backup still checks SQLite integrity and skips an already verified
 daily backup.
 
-The legacy `eastenders-fix.py` reads the same config via the environment or default
-location, but retains its existing live module-level behavior. Do not import it
-or run it as a setup test. QI settings relocate its show boundary; they do not turn
-its show-specific language assumptions into a general library policy.
+## Safe defaults and migration to 0.2
+
+- Bare main, Whisper, EastEnders and backup commands show help without loading
+  config, scanning media, reading credentials or making service calls.
+- The main repair command previews unless `--apply` is explicit. A preview may
+  download/transcribe to state; use `--scan-only` for an inventory without either.
+- Whisper now previews by default, without writing state or contacting ASR.
+  **Existing backfill schedules must add `--apply` to continue generation.**
+- EastEnders now has an import-safe `main()` and previews by default. Imports and
+  renames require `--apply`; redundant-source deletion additionally requires
+  `--cleanup-redundant`. Preview never deletes a source, including cleanup cases.
+- Subarr backup now requires `--apply` to create a backup. **Existing backup
+  schedules must add `--apply`.** No scheduler entries are changed by installation.
+- Config cannot enable apply, deletion or cleanup. Audit commands remain read-only.
+- QI settings relocate its show boundary; they do not generalize its assumptions.
+
+## Design and contributing
+
+Start with the [architecture](docs/architecture.md), [failure/recovery walkthrough](docs/design-walkthrough.md),
+and [synthetic example](examples/README.md). [CONTRIBUTING.md](CONTRIBUTING.md)
+describes development setup, testing and review expectations. See [LICENSE](LICENSE)
+for MIT terms. The project is an early release; unit tests are not a claim of
+universal subtitle correctness or complete external-integration coverage.
 
 ## Tests
 

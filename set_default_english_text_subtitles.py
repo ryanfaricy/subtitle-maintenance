@@ -18,9 +18,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 TEXT_CODEC_MARKERS = (
-    "subrip", "srt", "substationalpha", "ass", "ssa", "webvtt", "utf-8",
+    "subrip",
+    "srt",
+    "substationalpha",
+    "ass",
+    "ssa",
+    "webvtt",
+    "utf-8",
 )
 ENGLISH_TAGS = {"en", "eng", "english", "en-us", "en-gb"}
 CANDIDATE_STATUSES = {"ENGLISH_TEXT_NOT_DEFAULT", "AMBIGUOUS_ENGLISH_DEFAULTS"}
@@ -90,19 +95,28 @@ def describe(track: dict) -> str:
 
 def choose_track(tracks: list[dict]) -> dict | None:
     eligible = [
-        track for track in tracks
-        if is_text(track) and is_english(track) and not is_forced(track)
+        track for track in tracks if is_text(track) and is_english(track) and not is_forced(track)
     ]
     if not eligible:
         return None
+
     def rank(track: dict) -> tuple[int, int, int, int, int]:
         title = str(props(track).get("track_name") or "").lower()
         title_words = set(title.replace("_", " ").replace("-", " ").split())
         full_hint = bool(title_words & {"full", "complete", "dialogue", "dialog"})
-        limited_hint = bool(title_words & {
-            "commentary", "comments", "signs", "songs", "lyrics", "foreign",
-            "partial", "sample",
-        })
+        limited_hint = bool(
+            title_words
+            & {
+                "commentary",
+                "comments",
+                "signs",
+                "songs",
+                "lyrics",
+                "foreign",
+                "partial",
+                "sample",
+            }
+        )
         ocr_generated = "ocr text from bitmap" in title
         # Explicit full-dialogue labeling wins. Avoid limited/commentary tracks,
         # then prefer regular subtitles over SDH and native text over OCR.
@@ -162,7 +176,7 @@ def main() -> int:
 
     paths = candidate_paths(report, args.match)
     if args.limit:
-        paths = paths[:args.limit]
+        paths = paths[: args.limit]
     rows: list[dict[str, str]] = []
     proposed = changed = already_ok = skipped = errors = 0
     print(f"Candidates from audit: {len(paths)}", flush=True)
@@ -172,14 +186,28 @@ def main() -> int:
         if not video.is_file():
             errors += 1
             print("  ERROR: file not found", flush=True)
-            rows.append({"video": str(video), "action": "ERROR", "selected_track": "", "details": "file not found"})
+            rows.append(
+                {
+                    "video": str(video),
+                    "action": "ERROR",
+                    "selected_track": "",
+                    "details": "file not found",
+                }
+            )
             continue
         try:
             tracks = identify(video)
         except (subprocess.CalledProcessError, json.JSONDecodeError) as error:
             errors += 1
             print(f"  ERROR: cannot identify: {error}", flush=True)
-            rows.append({"video": str(video), "action": "ERROR", "selected_track": "", "details": str(error)})
+            rows.append(
+                {
+                    "video": str(video),
+                    "action": "ERROR",
+                    "selected_track": "",
+                    "details": str(error),
+                }
+            )
             continue
 
         subtitle_tracks = [track for track in tracks if track.get("type") == "subtitles"]
@@ -189,7 +217,14 @@ def main() -> int:
         if selected is None or uid(selected) is None:
             skipped += 1
             print("  SKIP: no explicitly English, non-forced text track with UID", flush=True)
-            rows.append({"video": str(video), "action": "SKIP", "selected_track": "", "details": "no eligible track"})
+            rows.append(
+                {
+                    "video": str(video),
+                    "action": "SKIP",
+                    "selected_track": "",
+                    "details": "no eligible track",
+                }
+            )
             continue
 
         competing_english_defaults = [
@@ -198,7 +233,14 @@ def main() -> int:
         if is_default(selected) and not competing_english_defaults:
             already_ok += 1
             print(f"  ALREADY OK: {describe(selected)}", flush=True)
-            rows.append({"video": str(video), "action": "ALREADY_OK", "selected_track": describe(selected), "details": ""})
+            rows.append(
+                {
+                    "video": str(video),
+                    "action": "ALREADY_OK",
+                    "selected_track": describe(selected),
+                    "details": "",
+                }
+            )
             continue
 
         proposed += 1
@@ -215,56 +257,114 @@ def main() -> int:
             original_stat = video.stat()
             command = ["mkvpropedit", str(video)]
             if not is_default(selected):
-                command.extend([
-                    "--edit", f"track:={uid(selected)}", "--set", "flag-default=1",
-                ])
+                command.extend(
+                    [
+                        "--edit",
+                        f"track:={uid(selected)}",
+                        "--set",
+                        "flag-default=1",
+                    ]
+                )
             for track in competing_english_defaults:
-                command.extend([
-                    "--edit", f"track:={uid(track)}", "--set", "flag-default=0",
-                ])
+                command.extend(
+                    [
+                        "--edit",
+                        f"track:={uid(track)}",
+                        "--set",
+                        "flag-default=0",
+                    ]
+                )
             result = subprocess.run(command, text=True, capture_output=True)
             os.utime(video, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
             if result.returncode:
                 errors += 1
                 detail = result.stderr.strip() or result.stdout.strip()
                 print(f"  ERROR editing: {detail}", flush=True)
-                rows.append({"video": str(video), "action": "ERROR", "selected_track": describe(selected), "details": detail})
+                rows.append(
+                    {
+                        "video": str(video),
+                        "action": "ERROR",
+                        "selected_track": describe(selected),
+                        "details": detail,
+                    }
+                )
                 continue
             try:
                 verified = identify(video)
             except (subprocess.CalledProcessError, json.JSONDecodeError) as error:
                 errors += 1
                 print(f"  ERROR verifying: {error}", flush=True)
-                rows.append({"video": str(video), "action": "ERROR", "selected_track": describe(selected), "details": f"verify: {error}"})
+                rows.append(
+                    {
+                        "video": str(video),
+                        "action": "ERROR",
+                        "selected_track": describe(selected),
+                        "details": f"verify: {error}",
+                    }
+                )
                 continue
             selected_uid = uid(selected)
-            defaults = [track for track in verified if track.get("type") == "subtitles" and is_default(track)]
-            verified_selected = next((track for track in defaults if uid(track) == selected_uid), None)
+            defaults = [
+                track
+                for track in verified
+                if track.get("type") == "subtitles" and is_default(track)
+            ]
+            verified_selected = next(
+                (track for track in defaults if uid(track) == selected_uid), None
+            )
             verified_english_defaults = [track for track in defaults if is_english(track)]
-            foreign_default_uids = {uid(track) for track in current_defaults if not is_english(track)}
+            foreign_default_uids = {
+                uid(track) for track in current_defaults if not is_english(track)
+            }
             after_default_uids = {uid(track) for track in defaults}
             if (
                 verified_selected is None
                 or len(verified_english_defaults) != 1
-                or not is_text(verified_selected) or not is_english(verified_selected)
+                or not is_text(verified_selected)
+                or not is_english(verified_selected)
                 or is_forced(verified_selected)
                 or not foreign_default_uids.issubset(after_default_uids)
             ):
                 errors += 1
                 print("  ERROR: post-edit verification failed", flush=True)
-                rows.append({"video": str(video), "action": "ERROR", "selected_track": describe(selected), "details": "verification failed"})
+                rows.append(
+                    {
+                        "video": str(video),
+                        "action": "ERROR",
+                        "selected_track": describe(selected),
+                        "details": "verification failed",
+                    }
+                )
                 continue
             changed += 1
-            print("    VERIFIED sole English text default; non-English defaults preserved", flush=True)
-            rows.append({"video": str(video), "action": "CHANGED", "selected_track": describe(verified_selected), "details": "verified"})
+            print(
+                "    VERIFIED sole English text default; non-English defaults preserved", flush=True
+            )
+            rows.append(
+                {
+                    "video": str(video),
+                    "action": "CHANGED",
+                    "selected_track": describe(verified_selected),
+                    "details": "verified",
+                }
+            )
         else:
-            rows.append({"video": str(video), "action": "WOULD_CHANGE", "selected_track": describe(selected), "details": ""})
+            rows.append(
+                {
+                    "video": str(video),
+                    "action": "WOULD_CHANGE",
+                    "selected_track": describe(selected),
+                    "details": "",
+                }
+            )
 
     if args.result:
         result_path = args.result.expanduser().resolve()
         result_path.parent.mkdir(parents=True, exist_ok=True)
         with result_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["video", "action", "selected_track", "details"])
+            writer = csv.DictWriter(
+                handle, fieldnames=["video", "action", "selected_track", "details"]
+            )
             writer.writeheader()
             writer.writerows(rows)
         print(f"Result CSV: {result_path}")

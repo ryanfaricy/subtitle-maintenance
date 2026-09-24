@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
 import argparse
 import json
 import os
@@ -11,13 +10,14 @@ import sys
 import tempfile
 import time
 from datetime import datetime
+from pathlib import Path
 
 from script_config import load_config, state_path, tool
 
 ASR_BASE_URL = os.getenv("WHISPER_ASR_URL", "http://127.0.0.1:9001").rstrip("/")
 ASR_MODEL = "large-v3-turbo"
 
-STATE_DIR = state_path({}, 'WhisperSubtitles')
+STATE_DIR = state_path({}, "WhisperSubtitles")
 STATE_DB = STATE_DIR / "state.db"
 
 FFMPEG = "ffmpeg"
@@ -64,12 +64,15 @@ def fingerprint(path):
 
 
 def get_state(db, path):
-    row = db.execute("""
+    row = db.execute(
+        """
         SELECT size, mtime_ns, first_seen, last_checked,
                status, subtitle_path, error, failure_time
         FROM files
         WHERE path = ?
-    """, (str(path),)).fetchone()
+    """,
+        (str(path),),
+    ).fetchone()
     if not row:
         return None
     return {
@@ -84,9 +87,12 @@ def get_state(db, path):
     }
 
 
-def save_state(db, path, size, mtime_ns, first_seen, status, subtitle_path=None, error=None, failure_time=None):
+def save_state(
+    db, path, size, mtime_ns, first_seen, status, subtitle_path=None, error=None, failure_time=None
+):
     now = time.time()
-    db.execute("""
+    db.execute(
+        """
         INSERT INTO files (
             path, size, mtime_ns, first_seen, last_checked,
             status, subtitle_path, error, failure_time
@@ -101,17 +107,31 @@ def save_state(db, path, size, mtime_ns, first_seen, status, subtitle_path=None,
             subtitle_path = excluded.subtitle_path,
             error = excluded.error,
             failure_time = excluded.failure_time
-    """, (
-        str(path), size, mtime_ns, first_seen, now, status,
-        str(subtitle_path) if subtitle_path else None,
-        error, failure_time,
-    ))
+    """,
+        (
+            str(path),
+            size,
+            mtime_ns,
+            first_seen,
+            now,
+            status,
+            str(subtitle_path) if subtitle_path else None,
+            error,
+            failure_time,
+        ),
+    )
     db.commit()
 
 
 def find_sidecar(video):
     stem = video.stem.lower()
-    dirs = [video.parent, video.parent / "Subs", video.parent / "subs", video.parent / "Subtitles", video.parent / "subtitles"]
+    dirs = [
+        video.parent,
+        video.parent / "Subs",
+        video.parent / "subs",
+        video.parent / "Subtitles",
+        video.parent / "subtitles",
+    ]
     for directory in dirs:
         if not directory.is_dir():
             continue
@@ -130,10 +150,14 @@ def find_sidecar(video):
 def has_audio_stream(video):
     cmd = [
         FFPROBE,
-        "-v", "error",
-        "-select_streams", "a",
-        "-show_entries", "stream=index",
-        "-of", "json",
+        "-v",
+        "error",
+        "-select_streams",
+        "a",
+        "-show_entries",
+        "stream=index",
+        "-of",
+        "json",
         str(video),
     ]
 
@@ -156,9 +180,16 @@ def has_audio_stream(video):
 
 def has_embedded_subtitle(video):
     cmd = [
-        FFPROBE, "-v", "error", "-select_streams", "s",
-        "-show_entries", "stream=index,codec_name:stream_tags=language,title",
-        "-of", "json", str(video),
+        FFPROBE,
+        "-v",
+        "error",
+        "-select_streams",
+        "s",
+        "-show_entries",
+        "stream=index,codec_name:stream_tags=language,title",
+        "-of",
+        "json",
+        str(video),
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -195,7 +226,7 @@ def make_srt(segments):
             continue
         start = format_timestamp(segment.get("start", 0))
         end = format_timestamp(segment.get("end", 0))
-        blocks.append(f"{len(blocks)+1}\n{start} --> {end}\n{text}\n")
+        blocks.append(f"{len(blocks) + 1}\n{start} --> {end}\n{text}\n")
     return "\n".join(blocks)
 
 
@@ -221,18 +252,39 @@ def terminate_process_group(proc, grace_seconds=5):
 
 def run_ffmpeg_extract(video, wav, timeout_seconds):
     cmd = [
-        FFMPEG, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(video), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000",
-        "-c:a", "pcm_s16le", str(wav),
+        FFMPEG,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(video),
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-c:a",
+        "pcm_s16le",
+        str(wav),
     ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, start_new_session=True
+    )
     try:
         _, stderr = proc.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
         terminate_process_group(proc)
-        raise RuntimeError(f"FFmpeg audio extraction timed out after {timeout_seconds/60:g} minutes")
+        raise RuntimeError(
+            f"FFmpeg audio extraction timed out after {timeout_seconds / 60:g} minutes"
+        )
     if proc.returncode != 0:
-        raise RuntimeError((stderr or "").strip() or f"FFmpeg failed with exit code {proc.returncode}")
+        raise RuntimeError(
+            (stderr or "").strip() or f"FFmpeg failed with exit code {proc.returncode}"
+        )
     if not wav.exists() or wav.stat().st_size == 0:
         raise RuntimeError("FFmpeg produced no audio")
 
@@ -276,7 +328,7 @@ def run_asr_transcription(wav, timeout_seconds):
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(
-            f"Whisper service request timed out after {timeout_seconds/60:g} minutes"
+            f"Whisper service request timed out after {timeout_seconds / 60:g} minutes"
         ) from exc
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "request failed").strip()[:2000]
@@ -348,7 +400,9 @@ def process_file(db, video, args):
         if status == "missing":
             sidecar = find_sidecar(video)
             if sidecar:
-                save_state(db, video, size, mtime_ns, state["first_seen"], "sidecar", subtitle_path=sidecar)
+                save_state(
+                    db, video, size, mtime_ns, state["first_seen"], "sidecar", subtitle_path=sidecar
+                )
                 log(f"COVERED sidecar: {video.name}")
                 return False
             first_seen = state["first_seen"]
@@ -362,11 +416,25 @@ def process_file(db, video, args):
                 log(f"WOULD TRANSCRIBE: {video}")
                 return False
             try:
-                subtitle = transcribe(video, max(1, int(args.ffmpeg_timeout_minutes*60)), max(1, int(args.whisper_timeout_minutes*60)))
-                save_state(db, video, size, mtime_ns, first_seen, "whisper_generated", subtitle_path=subtitle)
+                subtitle = transcribe(
+                    video,
+                    max(1, int(args.ffmpeg_timeout_minutes * 60)),
+                    max(1, int(args.whisper_timeout_minutes * 60)),
+                )
+                save_state(
+                    db,
+                    video,
+                    size,
+                    mtime_ns,
+                    first_seen,
+                    "whisper_generated",
+                    subtitle_path=subtitle,
+                )
                 return True
             except Exception as e:
-                save_state(db, video, size, mtime_ns, first_seen, "failed", error=str(e), failure_time=now)
+                save_state(
+                    db, video, size, mtime_ns, first_seen, "failed", error=str(e), failure_time=now
+                )
                 log(f"FAILED: {video}: {e}")
                 return False
 
@@ -397,7 +465,9 @@ def process_file(db, video, args):
         embedded = has_embedded_subtitle(video)
     except Exception as e:
         if not args.dry_run:
-            save_state(db, video, size, mtime_ns, first_seen, "failed", error=str(e), failure_time=now)
+            save_state(
+                db, video, size, mtime_ns, first_seen, "failed", error=str(e), failure_time=now
+            )
         log(f"FAILED ffprobe: {video}: {e}")
         return False
 
@@ -423,8 +493,14 @@ def process_file(db, video, args):
         return False
 
     try:
-        subtitle = transcribe(video, max(1, int(args.ffmpeg_timeout_minutes*60)), max(1, int(args.whisper_timeout_minutes*60)))
-        save_state(db, video, size, mtime_ns, first_seen, "whisper_generated", subtitle_path=subtitle)
+        subtitle = transcribe(
+            video,
+            max(1, int(args.ffmpeg_timeout_minutes * 60)),
+            max(1, int(args.whisper_timeout_minutes * 60)),
+        )
+        save_state(
+            db, video, size, mtime_ns, first_seen, "whisper_generated", subtitle_path=subtitle
+        )
         return True
     except Exception as e:
         save_state(db, video, size, mtime_ns, first_seen, "failed", error=str(e), failure_time=now)
@@ -432,37 +508,69 @@ def process_file(db, video, args):
         return False
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Production Whisper subtitle backfill: idempotent, 12-hour grace capable, and watchdog protected.")
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Production Whisper subtitle backfill: idempotent, 12-hour grace capable, and watchdog protected."
+    )
     parser.add_argument("--config", type=Path)
     parser.add_argument("--path", help="File or directory; defaults to config media_root")
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--service-url")
     parser.add_argument("--model")
     parser.add_argument("--grace-hours", type=float, default=GRACE_HOURS_DEFAULT)
-    parser.add_argument("--max-files", type=int, default=1, help="Maximum transcriptions per run; 0 means unlimited")
+    parser.add_argument(
+        "--max-files", type=int, default=1, help="Maximum transcriptions per run; 0 means unlimited"
+    )
     parser.add_argument("--scan-only", action="store_true")
     parser.add_argument("--ignore-grace", action="store_true")
-    parser.add_argument("--rescan", action="store_true", help="Ignore cached classification and inspect files again")
-    parser.add_argument("--clear-state", action="store_true", help="Delete the idempotence database before starting")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--rescan", action="store_true", help="Ignore cached classification and inspect files again"
+    )
+    parser.add_argument(
+        "--clear-state", action="store_true", help="Delete the idempotence database before starting"
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="Preview only (the default)")
+    mode.add_argument(
+        "--apply", action="store_true", help="Allow subtitle generation and state changes"
+    )
     parser.add_argument("--ffmpeg-timeout-minutes", type=float, default=FFMPEG_TIMEOUT_SECONDS / 60)
-    parser.add_argument("--whisper-timeout-minutes", type=float, default=WHISPER_TIMEOUT_SECONDS / 60)
-    args = parser.parse_args()
+    parser.add_argument(
+        "--whisper-timeout-minutes", type=float, default=WHISPER_TIMEOUT_SECONDS / 60
+    )
+    arguments = sys.argv[1:] if argv is None else argv
+    if not arguments:
+        parser.print_help()
+        return 0
+    args = parser.parse_args(arguments)
+    args.dry_run = not args.apply
+    if args.clear_state and not args.apply:
+        parser.error("--clear-state requires --apply")
+    if args.scan_only and args.apply:
+        parser.error("--scan-only cannot be combined with --apply")
+    if args.max_files < 0 or args.grace_hours < 0:
+        parser.error("File limit and grace hours must be nonnegative")
+    if args.ffmpeg_timeout_minutes <= 0 or args.whisper_timeout_minutes <= 0:
+        parser.error("Timeouts must be positive")
 
     global STATE_DIR, STATE_DB, ASR_BASE_URL, ASR_MODEL, FFMPEG, FFPROBE, CURL
     try:
         config = load_config(args.config)
-        whisper = config.get('whisper', {})
-        selected = args.path or config.get('media_root')
+        whisper = config.get("whisper", {})
+        selected = args.path or config.get("media_root")
         if not selected:
-            parser.error('Supply --path or set media_root in config')
-        STATE_DIR = args.state_dir or state_path(whisper, 'WhisperSubtitles')
+            parser.error("Supply --path or set media_root in config")
+        STATE_DIR = args.state_dir or state_path(whisper, "WhisperSubtitles")
         STATE_DIR = STATE_DIR.expanduser()
-        STATE_DB = STATE_DIR / 'state.db'
-        ASR_BASE_URL = (args.service_url or os.getenv('WHISPER_ASR_URL') or whisper.get('service_url') or 'http://127.0.0.1:9001').rstrip('/')
-        ASR_MODEL = args.model or whisper.get('model', 'large-v3-turbo')
-        FFMPEG, FFPROBE, CURL = (tool(config, name) for name in ('ffmpeg', 'ffprobe', 'curl'))
+        STATE_DB = STATE_DIR / "state.db"
+        ASR_BASE_URL = (
+            args.service_url
+            or os.getenv("WHISPER_ASR_URL")
+            or whisper.get("service_url")
+            or "http://127.0.0.1:9001"
+        ).rstrip("/")
+        ASR_MODEL = args.model or whisper.get("model", "large-v3-turbo")
+        FFMPEG, FFPROBE, CURL = (tool(config, name) for name in ("ffmpeg", "ffprobe", "curl"))
     except ValueError as e:
         parser.error(str(e))
     root = Path(selected).expanduser()
@@ -470,7 +578,8 @@ def main():
         log(f"Media path unavailable: {root}")
         return 0
     try:
-        check_asr_service()
+        if args.apply:
+            check_asr_service()
     except (OSError, subprocess.SubprocessError, RuntimeError) as e:
         log(str(e))
         return 1
@@ -478,7 +587,13 @@ def main():
         STATE_DB.unlink()
         log(f"Cleared state database: {STATE_DB}")
 
-    db = connect_db()
+    if args.dry_run:
+        db = sqlite3.connect(":memory:")
+        db.row_factory = sqlite3.Row
+        db.execute("""CREATE TABLE files (path TEXT PRIMARY KEY, size INTEGER, mtime_ns INTEGER,
+            first_seen REAL, last_checked REAL, status TEXT, subtitle_path TEXT, error TEXT, failure_time REAL)""")
+    else:
+        db = connect_db()
     transcribed = 0
     examined = 0
     try:

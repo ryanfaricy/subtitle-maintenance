@@ -21,20 +21,17 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 FFPROBE = "ffprobe"
 
 VIDEO_EXTENSIONS = {".mkv", ".mka", ".mks", ".mp4", ".m4v", ".mov", ".avi", ".ts", ".m2ts"}
 MATROSKA_EXTENSIONS = {".mkv", ".mka", ".mks"}
 BITMAP_CODECS = {
-    "dvd_subtitle",          # DVD/VobSub
-    "hdmv_pgs_subtitle",     # Blu-ray PGS
-    "dvb_subtitle",          # DVB bitmap subtitles
-    "xsub",                  # DivX bitmap subtitles
+    "dvd_subtitle",  # DVD/VobSub
+    "hdmv_pgs_subtitle",  # Blu-ray PGS
+    "dvb_subtitle",  # DVB bitmap subtitles
+    "xsub",  # DivX bitmap subtitles
 }
-TEXT_CODECS = {
-    "subrip", "srt", "ass", "ssa", "webvtt", "mov_text", "text", "hdmv_text_subtitle"
-}
+TEXT_CODECS = {"subrip", "srt", "ass", "ssa", "webvtt", "mov_text", "text", "hdmv_text_subtitle"}
 TEXT_SIDECAR_EXTENSIONS = {".srt", ".ass", ".ssa", ".vtt", ".webvtt", ".ttml", ".dfxp", ".smi"}
 ENGLISH_LANGUAGE_TAGS = {"en", "eng", "english"}
 OCR_TITLE_PREFIX = "OCR text from bitmap track"
@@ -47,28 +44,56 @@ SRT_TIMESTAMP_RE = re.compile(
 # Apple Vision accepts BCP-47 tags. Subtitle Edit also maps many short/alpha3
 # codes, but explicit mappings keep common library languages deterministic.
 APPLE_VISION_LANGUAGES = {
-    "eng": "en-US", "en": "en-US",
-    "spa": "es-ES", "es": "es-ES",
-    "fra": "fr-FR", "fre": "fr-FR", "fr": "fr-FR",
-    "deu": "de-DE", "ger": "de-DE", "de": "de-DE",
-    "ita": "it-IT", "it": "it-IT",
-    "por": "pt-PT", "pt": "pt-PT",
-    "nld": "nl-NL", "dut": "nl-NL", "nl": "nl-NL",
-    "jpn": "ja-JP", "ja": "ja-JP",
-    "kor": "ko-KR", "ko": "ko-KR",
-    "zho": "zh-Hans", "chi": "zh-Hans", "zh": "zh-Hans",
+    "eng": "en-US",
+    "en": "en-US",
+    "spa": "es-ES",
+    "es": "es-ES",
+    "fra": "fr-FR",
+    "fre": "fr-FR",
+    "fr": "fr-FR",
+    "deu": "de-DE",
+    "ger": "de-DE",
+    "de": "de-DE",
+    "ita": "it-IT",
+    "it": "it-IT",
+    "por": "pt-PT",
+    "pt": "pt-PT",
+    "nld": "nl-NL",
+    "dut": "nl-NL",
+    "nl": "nl-NL",
+    "jpn": "ja-JP",
+    "ja": "ja-JP",
+    "kor": "ko-KR",
+    "ko": "ko-KR",
+    "zho": "zh-Hans",
+    "chi": "zh-Hans",
+    "zh": "zh-Hans",
 }
 TESSERACT_LANGUAGES = {
-    "en": "eng", "eng": "eng",
-    "es": "spa", "spa": "spa",
-    "fr": "fra", "fre": "fra", "fra": "fra",
-    "de": "deu", "ger": "deu", "deu": "deu",
-    "it": "ita", "ita": "ita",
-    "pt": "por", "por": "por",
-    "nl": "nld", "dut": "nld", "nld": "nld",
-    "ja": "jpn", "jpn": "jpn",
-    "ko": "kor", "kor": "kor",
-    "zh": "chi_sim", "chi": "chi_sim", "zho": "chi_sim",
+    "en": "eng",
+    "eng": "eng",
+    "es": "spa",
+    "spa": "spa",
+    "fr": "fra",
+    "fre": "fra",
+    "fra": "fra",
+    "de": "deu",
+    "ger": "deu",
+    "deu": "deu",
+    "it": "ita",
+    "ita": "ita",
+    "pt": "por",
+    "por": "por",
+    "nl": "nld",
+    "dut": "nld",
+    "nld": "nld",
+    "ja": "jpn",
+    "jpn": "jpn",
+    "ko": "kor",
+    "kor": "kor",
+    "zh": "chi_sim",
+    "chi": "chi_sim",
+    "zho": "chi_sim",
 }
 
 
@@ -83,9 +108,7 @@ def run(command: list[str], *, capture: bool = True) -> subprocess.CompletedProc
 
 
 def probe(path: Path) -> list[dict]:
-    result = run([
-        "ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)
-    ])
+    result = run(["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)])
     return json.loads(result.stdout).get("streams", [])
 
 
@@ -99,9 +122,9 @@ def tag(stream: dict, name: str, default: str = "") -> str:
 
 def bitmap_tracks(streams: list[dict]) -> list[dict]:
     return [
-        stream for stream in streams
-        if stream.get("codec_type") == "subtitle"
-        and stream.get("codec_name") in BITMAP_CODECS
+        stream
+        for stream in streams
+        if stream.get("codec_type") == "subtitle" and stream.get("codec_name") in BITMAP_CODECS
     ]
 
 
@@ -155,19 +178,14 @@ def is_english_language(language: str) -> bool:
 def language_is_selected(language: str, allowed_languages: set[str] | None) -> bool:
     if allowed_languages is None or language in allowed_languages:
         return True
-    return is_english_language(language) and bool(
-        allowed_languages & ENGLISH_LANGUAGE_TAGS
-    )
+    return is_english_language(language) and bool(allowed_languages & ENGLISH_LANGUAGE_TAGS)
 
 
 def is_forced_track(stream: dict) -> bool:
     disposition = stream.get("disposition") or {}
     if bool(disposition.get("forced")):
         return True
-    title_words = {
-        word.strip("[](){}._-").lower()
-        for word in tag(stream, "title").split()
-    }
+    title_words = {word.strip("[](){}._-").lower() for word in tag(stream, "title").split()}
     return "forced" in title_words
 
 
@@ -179,14 +197,8 @@ def is_english_text_track(stream: dict) -> bool:
     ):
         return False
     language = language_for_track(stream)
-    title_words = {
-        word.strip("[](){}._-").lower()
-        for word in tag(stream, "title").split()
-    }
-    return (
-        is_english_language(language)
-        or bool(title_words & ENGLISH_LANGUAGE_TAGS)
-    )
+    title_words = {word.strip("[](){}._-").lower() for word in tag(stream, "title").split()}
+    return is_english_language(language) or bool(title_words & ENGLISH_LANGUAGE_TAGS)
 
 
 def english_text_sidecars(video: Path) -> list[Path]:
@@ -206,7 +218,8 @@ def english_text_sidecars(video: Path) -> list[Path]:
         if not candidate_stem.startswith(prefix):
             continue
         qualifiers = {
-            part for part in candidate_stem[len(prefix):].replace("-", ".").replace("_", ".").split(".")
+            part
+            for part in candidate_stem[len(prefix) :].replace("-", ".").replace("_", ".").split(".")
             if part
         }
         if "forced" in qualifiers:
@@ -241,9 +254,8 @@ def srt_time_ms(parts: tuple[str, str, str, str]) -> int:
     hours_text, minutes_text, seconds_text, milliseconds_text = parts
     sign = -1 if hours_text.startswith("-") else 1
     hours = abs(int(hours_text))
-    total = (
-        ((hours * 60 + int(minutes_text)) * 60 + int(seconds_text)) * 1000
-        + int(milliseconds_text)
+    total = ((hours * 60 + int(minutes_text)) * 60 + int(seconds_text)) * 1000 + int(
+        milliseconds_text
     )
     return sign * total
 
@@ -274,16 +286,18 @@ def normalize_srt(path: Path) -> int:
         end_ms = max(start_ms + 1, end_ms)
 
         next_timestamp = (
-            timestamp_lines[cue_number + 1]
-            if cue_number + 1 < len(timestamp_lines)
-            else len(lines)
+            timestamp_lines[cue_number + 1] if cue_number + 1 < len(timestamp_lines) else len(lines)
         )
-        text_lines = lines[timestamp_index + 1:next_timestamp]
+        text_lines = lines[timestamp_index + 1 : next_timestamp]
         while text_lines and not text_lines[-1].strip():
             text_lines.pop()
         # The numeric index belonging to the next cue sits immediately before
         # its timestamp and is not caption text.
-        if cue_number + 1 < len(timestamp_lines) and text_lines and text_lines[-1].strip().isdigit():
+        if (
+            cue_number + 1 < len(timestamp_lines)
+            and text_lines
+            and text_lines[-1].strip().isdigit()
+        ):
             text_lines.pop()
             while text_lines and not text_lines[-1].strip():
                 text_lines.pop()
@@ -298,12 +312,14 @@ def normalize_srt(path: Path) -> int:
 
     normalized: list[str] = []
     for index, (start_ms, end_ms, text_lines) in enumerate(cues, start=1):
-        normalized.extend([
-            str(index),
-            f"{format_srt_time(start_ms)} --> {format_srt_time(end_ms)}",
-            *text_lines,
-            "",
-        ])
+        normalized.extend(
+            [
+                str(index),
+                f"{format_srt_time(start_ms)} --> {format_srt_time(end_ms)}",
+                *text_lines,
+                "",
+            ]
+        )
     path.write_text("\n".join(normalized), encoding="utf-8")
     return len(cues)
 
@@ -385,11 +401,13 @@ def verify_output(
         )
 
     original_text_count = sum(
-        1 for stream in original_streams
+        1
+        for stream in original_streams
         if stream.get("codec_type") == "subtitle" and stream.get("codec_name") in TEXT_CODECS
     )
     output_text_count = sum(
-        1 for stream in output_streams
+        1
+        for stream in output_streams
         if stream.get("codec_type") == "subtitle" and stream.get("codec_name") in TEXT_CODECS
     )
     expected_text_count = original_text_count - len(removed_titles) + added_count
@@ -429,8 +447,7 @@ def remux(
     if remove_titles:
         identification = json.loads(run([mkvmerge, "-J", str(video)]).stdout)
         subtitle_tracks = [
-            track for track in identification.get("tracks", [])
-            if track.get("type") == "subtitles"
+            track for track in identification.get("tracks", []) if track.get("type") == "subtitles"
         ]
         kept_subtitle_ids = [
             str(track["id"])
@@ -444,12 +461,17 @@ def remux(
     command.append(str(video))
     for stream, subtitle in tracks:
         language = language_for_track(stream)
-        command.extend([
-            "--language", f"0:{language}",
-            "--track-name", f"0:{ocr_marker(stream)}",
-            "--default-track-flag", "0:no",
-            str(subtitle),
-        ])
+        command.extend(
+            [
+                "--language",
+                f"0:{language}",
+                "--track-name",
+                f"0:{ocr_marker(stream)}",
+                "--default-track-flag",
+                "0:no",
+                str(subtitle),
+            ]
+        )
 
     actions = []
     if tracks:
@@ -464,10 +486,7 @@ def remux(
     if result.returncode >= 2:
         raise RuntimeError(f"MKV remux failed: {details}")
     if result.returncode == 1:
-        warning_lines = [
-            line for line in details.splitlines()
-            if "warning" in line.lower()
-        ]
+        warning_lines = [line for line in details.splitlines() if "warning" in line.lower()]
         print(
             "      mkvmerge completed with warning(s); verifying output: "
             + (" | ".join(warning_lines) if warning_lines else details),
@@ -482,8 +501,7 @@ def remux(
     os.replace(output, video)
     os.utime(video, ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns))
     print(
-        "    VERIFIED AND REPLACED "
-        "(original bitmap tracks and file timestamps retained)",
+        "    VERIFIED AND REPLACED (original bitmap tracks and file timestamps retained)",
         flush=True,
     )
 
@@ -491,13 +509,20 @@ def remux(
 def bitmap_has_payload(video: Path, stream: dict) -> bool:
     """Distinguish real bitmap payloads from PGS control/clear-only streams."""
     try:
-        result = run([
-            "ffprobe", "-v", "error",
-            "-select_streams", str(stream["index"]),
-            "-show_entries", "packet=size",
-            "-of", "csv=p=0",
-            str(video),
-        ])
+        result = run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                str(stream["index"]),
+                "-show_entries",
+                "packet=size",
+                "-of",
+                "csv=p=0",
+                str(video),
+            ]
+        )
     except subprocess.CalledProcessError:
         return True  # Ambiguous probe results should be reviewed/processed, not hidden.
     sizes = [int(line) for line in result.stdout.splitlines() if line.strip().isdigit()]
@@ -526,28 +551,29 @@ def audit_file(video: Path) -> dict[str, str]:
 
     bitmaps = bitmap_tracks(streams)
     native_text = [
-        stream for stream in streams
+        stream
+        for stream in streams
         if is_english_text_track(stream) and not is_generated_ocr_track(stream)
     ]
     sidecars = english_text_sidecars(video)
     generated = [stream for stream in streams if is_generated_ocr_track(stream)]
     generated_forced = [
-        stream for stream in generated
-        if generated_from_forced_track(stream, streams)
+        stream for stream in generated if generated_from_forced_track(stream, streams)
     ]
     generated_full = [stream for stream in generated if stream not in generated_forced]
     full_english_bitmap = [
-        stream for stream in bitmaps
-        if is_english_language(language_for_track(stream))
-        and not is_forced_track(stream)
+        stream
+        for stream in bitmaps
+        if is_english_language(language_for_track(stream)) and not is_forced_track(stream)
     ]
     forced_english_bitmap = [
-        stream for stream in bitmaps
-        if is_english_language(language_for_track(stream))
-        and is_forced_track(stream)
+        stream
+        for stream in bitmaps
+        if is_english_language(language_for_track(stream)) and is_forced_track(stream)
     ]
     unknown_bitmap = [
-        stream for stream in bitmaps
+        stream
+        for stream in bitmaps
         if language_for_track(stream) == "und" and not is_forced_track(stream)
     ]
     cleanup = list(generated_forced)
@@ -555,15 +581,17 @@ def audit_file(video: Path) -> dict[str, str]:
         cleanup.extend(generated)
     cleanup = list({stream["index"]: stream for stream in cleanup}.values())
 
-    row.update({
-        "native_english_text": str(len(native_text)),
-        "english_sidecars": str(len(sidecars)),
-        "generated_ocr": str(len(generated)),
-        "full_english_bitmap": str(len(full_english_bitmap)),
-        "forced_english_bitmap": str(len(forced_english_bitmap)),
-        "unknown_bitmap": str(len(unknown_bitmap)),
-        "cleanup_candidates": str(len(cleanup)),
-    })
+    row.update(
+        {
+            "native_english_text": str(len(native_text)),
+            "english_sidecars": str(len(sidecars)),
+            "generated_ocr": str(len(generated)),
+            "full_english_bitmap": str(len(full_english_bitmap)),
+            "forced_english_bitmap": str(len(forced_english_bitmap)),
+            "unknown_bitmap": str(len(unknown_bitmap)),
+            "cleanup_candidates": str(len(cleanup)),
+        }
+    )
 
     if cleanup:
         row["status"] = "CLEANUP_CANDIDATE"
@@ -582,10 +610,7 @@ def audit_file(video: Path) -> dict[str, str]:
     elif generated_full:
         row["status"] = "SATISFIED_GENERATED_OCR"
     elif full_english_bitmap:
-        usable = [
-            stream for stream in full_english_bitmap
-            if bitmap_has_payload(video, stream)
-        ]
+        usable = [stream for stream in full_english_bitmap if bitmap_has_payload(video, stream)]
         if not usable:
             row["status"] = "NO_USABLE_BITMAP_PAYLOAD"
             row["details"] = "English bitmap streams contain only control/clear packets"
@@ -607,9 +632,16 @@ def audit_file(video: Path) -> dict[str, str]:
 def write_audit(library: Path, report: Path, limit: int) -> int:
     report.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
-        "path", "status", "details", "native_english_text", "english_sidecars",
-        "generated_ocr", "full_english_bitmap", "forced_english_bitmap",
-        "unknown_bitmap", "cleanup_candidates",
+        "path",
+        "status",
+        "details",
+        "native_english_text",
+        "english_sidecars",
+        "generated_ocr",
+        "full_english_bitmap",
+        "forced_english_bitmap",
+        "unknown_bitmap",
+        "cleanup_candidates",
     ]
     counts: dict[str, int] = {}
     inspected = 0
@@ -659,7 +691,8 @@ def process_file(
     tracks = bitmap_tracks(streams)
     generated_ocr_tracks = [stream for stream in streams if is_generated_ocr_track(stream)]
     native_english_text = [
-        stream for stream in streams
+        stream
+        for stream in streams
         if is_english_text_track(stream) and not is_generated_ocr_track(stream)
     ]
     redundant_ocr_tracks = []
@@ -667,10 +700,13 @@ def process_file(
         redundant_ocr_tracks.extend(generated_ocr_tracks)
     if remove_forced_ocr_text:
         redundant_ocr_tracks.extend(
-            stream for stream in generated_ocr_tracks
+            stream
+            for stream in generated_ocr_tracks
             if generated_from_forced_track(stream, streams)
         )
-    redundant_ocr_tracks = list({stream["index"]: stream for stream in redundant_ocr_tracks}.values())
+    redundant_ocr_tracks = list(
+        {stream["index"]: stream for stream in redundant_ocr_tracks}.values()
+    )
 
     if redundant_ocr_tracks:
         print(f"REDUNDANT OCR TEXT: {video}")
@@ -725,26 +761,27 @@ def process_file(
     )
     unconverted = [stream for stream in tracks if not already_converted(stream, streams)]
     eligible = [
-        stream for stream in unconverted
+        stream
+        for stream in unconverted
         if (include_forced or not is_forced_track(stream))
         and (
             (language_for_track(stream) == "und" and include_unknown)
             or (
                 language_for_track(stream) != "und"
-                and (
-                    language_is_selected(language_for_track(stream), allowed_languages)
-                )
+                and (language_is_selected(language_for_track(stream), allowed_languages))
             )
         )
     ]
     empty_payload_indexes = {
-        stream["index"] for stream in eligible
+        stream["index"]
+        for stream in eligible
         if not skip_for_existing_text and not bitmap_has_payload(video, stream)
     }
-    pending = [] if skip_for_existing_text else [
-        stream for stream in eligible
-        if stream["index"] not in empty_payload_indexes
-    ]
+    pending = (
+        []
+        if skip_for_existing_text
+        else [stream for stream in eligible if stream["index"] not in empty_payload_indexes]
+    )
     print(f"BITMAP SUBTITLES: {video}")
     for stream in tracks:
         language = language_for_track(stream)
@@ -787,7 +824,10 @@ def process_file(
         return 0, 0, 1 if apply else 0
 
     if not apply:
-        print(f"  WOULD OCR AND ADD: {len(pending)} text track(s); bitmap tracks retained.\n", flush=True)
+        print(
+            f"  WOULD OCR AND ADD: {len(pending)} text track(s); bitmap tracks retained.\n",
+            flush=True,
+        )
         return len(pending), 0, 0
 
     assert seconv and mkvmerge and ocr_engine
@@ -825,12 +865,15 @@ def main() -> int:
     )
     parser.add_argument("library", type=Path, help="Media library root or one media file")
     parser.add_argument(
-        "--apply", action="store_true",
-        help="Perform OCR/remux. Without this flag, the script is read-only."
+        "--apply",
+        action="store_true",
+        help="Perform OCR/remux. Without this flag, the script is read-only.",
     )
     parser.add_argument(
-        "--limit", type=int, default=0,
-        help="Stop after this many video files (0 means no limit). Useful for testing."
+        "--limit",
+        type=int,
+        default=0,
+        help="Stop after this many video files (0 means no limit). Useful for testing.",
     )
     parser.add_argument("--ffprobe", default="ffprobe", help="ffprobe executable")
     parser.add_argument("--seconv", help="Path to Subtitle Edit's seconv executable")
@@ -912,7 +955,11 @@ def main() -> int:
         return write_audit(library, report, args.limit)
 
     bundled_seconv = Path(__file__).resolve().parent.parent / "seconv-5.2.0/seconv"
-    seconv = args.seconv or shutil.which("seconv") or (str(bundled_seconv) if bundled_seconv.is_file() else None)
+    seconv = (
+        args.seconv
+        or shutil.which("seconv")
+        or (str(bundled_seconv) if bundled_seconv.is_file() else None)
+    )
     mkvmerge = args.mkvmerge or shutil.which("mkvmerge")
     if seconv:
         seconv = str(Path(seconv).expanduser())
@@ -921,8 +968,9 @@ def main() -> int:
     if args.apply and (not seconv or not mkvmerge):
         missing = [name for name, path in (("seconv", seconv), ("mkvmerge", mkvmerge)) if not path]
         parser.error(
-            "Apply mode requires missing tool(s): " + ", ".join(missing) +
-            ". Install Subtitle Edit 5 CLI and MKVToolNix first."
+            "Apply mode requires missing tool(s): "
+            + ", ".join(missing)
+            + ". Install Subtitle Edit 5 CLI and MKVToolNix first."
         )
 
     ocr_engine = None
@@ -931,7 +979,8 @@ def main() -> int:
             engine_result = run([seconv, "list-ocr-engines", "--json"])
             engine_data = json.loads(engine_result.stdout)
             ready_engines = {
-                item.get("id") for item in engine_data.get("engines", [])
+                item.get("id")
+                for item in engine_data.get("engines", [])
                 if item.get("ready") is not False
             }
         except (subprocess.CalledProcessError, json.JSONDecodeError) as error:
@@ -983,7 +1032,9 @@ def main() -> int:
     print(f"  Videos inspected: {scanned}")
     print(f"  Files needing attention: {found_files}")
     print(f"  OCR text tracks {'added' if args.apply else 'proposed'}: {proposed_tracks}")
-    print(f"  Redundant OCR tracks {'removed' if args.apply else 'proposed for removal'}: {removed_tracks}")
+    print(
+        f"  Redundant OCR tracks {'removed' if args.apply else 'proposed for removal'}: {removed_tracks}"
+    )
     print(f"  Errors/skips: {errors}")
     if not args.apply:
         print("  Preview only; no files were changed.")

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subtitle-maintenance"
+version = "0.2.0"
+description = "Conservative English subtitle verification, repair, and recoverable maintenance"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Ryan Faricy"}]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+]
+dependencies = []
+
+[project.optional-dependencies]
+providers = ["requests>=2.31,<3", "PyYAML>=6,<7"]
+mlx = ["mlx-whisper>=0.4,<1; sys_platform == 'darwin' and platform_machine == 'arm64'"]
+dev = ["ruff==0.16.8", "build>=1.2,<2", "requests>=2.31,<3", "PyYAML>=6,<7"]
+
+[project.scripts]
+subtitle-maintain = "subtitle_maintenance.cli:main"
+
+[project.urls]
+Repository = "https://github.com/ryanfaricy/subtitle-maintenance"
+Issues = "https://github.com/ryanfaricy/subtitle-maintenance/issues"
+
+[tool.setuptools]
+include-package-data = false
+py-modules = ["script_config", "local_credentials"]
+
+[tool.setuptools.packages.find]
+include = ["subtitle_maintenance"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["old", "seconv-5.2.0", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

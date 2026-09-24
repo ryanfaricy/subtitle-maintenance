@@ -1,5 +1,13 @@
 # Active script context — 2026-09-23
 
+## Version 0.2 safety changes
+
+Bare entry points now show help. Whisper generation and Subarr backup require
+`--apply`; update scheduled invocations explicitly. EastEnders is safe to import,
+previews by default, and requires `--apply --cleanup-redundant` for source deletion.
+See [README.md](README.md) for setup, config validation, packaging and migration.
+
+
 ## Shared configuration and portable installation
 
 See [README.md](README.md) for clone setup and shared settings. The loader now

@@ -17,7 +17,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 from script_config import load_config, show_path
 
 QI_ROOT = None
@@ -60,7 +59,9 @@ def audit_candidates(report: Path) -> list[Path]:
                 continue
             if video.suffix.lower() != ".mkv":
                 continue
-            if ":und" not in summary or not any(codec in summary for codec in ("subrip", "ass", "ssa")):
+            if ":und" not in summary or not any(
+                codec in summary for codec in ("subrip", "ass", "ssa")
+            ):
                 continue
             candidates.append(video)
     return sorted(set(candidates))
@@ -71,20 +72,24 @@ def main() -> int:
         description="Preview or fix verified English QI text tracks tagged as und."
     )
     parser.add_argument(
-        "--report", type=Path,
+        "--report",
+        type=Path,
         default=Path.home() / "missing-english-text-subtitles.csv",
         help="Audit CSV (default: ~/missing-english-text-subtitles.csv)",
     )
     parser.add_argument(
-        "--apply", action="store_true",
+        "--apply",
+        action="store_true",
         help="Apply language metadata changes. Without this flag, preview only.",
     )
-    parser.add_argument('--config', type=Path)
-    parser.add_argument('--qi-root', type=Path, help='Restrict the audit to this QI folder')
+    parser.add_argument("--config", type=Path)
+    parser.add_argument("--qi-root", type=Path, help="Restrict the audit to this QI folder")
     args = parser.parse_args()
     global QI_ROOT
-    try:QI_ROOT = (args.qi_root or show_path(load_config(args.config), 'QI')).expanduser().resolve()
-    except ValueError as e:parser.error(str(e))
+    try:
+        QI_ROOT = (args.qi_root or show_path(load_config(args.config), "QI")).expanduser().resolve()
+    except ValueError as e:
+        parser.error(str(e))
 
     report = args.report.expanduser().resolve()
     if not report.is_file():
@@ -110,8 +115,10 @@ def main() -> int:
             continue
 
         english = [
-            track for track in tracks
-            if is_text_track(track) and not is_forced(track)
+            track
+            for track in tracks
+            if is_text_track(track)
+            and not is_forced(track)
             and language(track) in {"en", "eng", "en-us", "en-gb"}
         ]
         if english:
@@ -120,7 +127,8 @@ def main() -> int:
             continue
 
         targets = [
-            track for track in tracks
+            track
+            for track in tracks
             if is_text_track(track) and not is_forced(track) and language(track) == "und"
         ]
         if not targets:
@@ -150,11 +158,16 @@ def main() -> int:
                 print(f"ERROR missing track UID: {video}", flush=True)
                 command = []
                 break
-            command.extend([
-                "--edit", f"track:={uid}",
-                "--set", "language=eng",
-                "--set", "language-ietf=en",
-            ])
+            command.extend(
+                [
+                    "--edit",
+                    f"track:={uid}",
+                    "--set",
+                    "language=eng",
+                    "--set",
+                    "language-ietf=en",
+                ]
+            )
         if not command:
             continue
 
@@ -162,7 +175,10 @@ def main() -> int:
         os.utime(video, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
         if result.returncode:
             errors += 1
-            print(f"ERROR editing {video}: {result.stderr.strip() or result.stdout.strip()}", flush=True)
+            print(
+                f"ERROR editing {video}: {result.stderr.strip() or result.stdout.strip()}",
+                flush=True,
+            )
             continue
 
         try:
@@ -176,9 +192,9 @@ def main() -> int:
             language(track) in {"en", "eng"}
             for track in verified
             if (track.get("properties") or {}).get("uid") in target_uids
-        ) and target_uids.issubset({
-            (track.get("properties") or {}).get("uid") for track in verified
-        })
+        ) and target_uids.issubset(
+            {(track.get("properties") or {}).get("uid") for track in verified}
+        )
         if not verified_ok:
             errors += 1
             print(f"ERROR verification failed: {video}", flush=True)

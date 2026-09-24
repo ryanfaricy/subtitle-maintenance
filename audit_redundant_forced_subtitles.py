@@ -18,26 +18,73 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-
 VIDEO_EXTENSIONS = {
-    ".3gp", ".asf", ".avi", ".divx", ".flv", ".m2ts", ".m4v", ".mkv",
-    ".mov", ".mp4", ".mpeg", ".mpg", ".mts", ".ogm", ".ogv", ".rm",
-    ".rmvb", ".ts", ".vob", ".webm", ".wmv",
+    ".3gp",
+    ".asf",
+    ".avi",
+    ".divx",
+    ".flv",
+    ".m2ts",
+    ".m4v",
+    ".mkv",
+    ".mov",
+    ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".mts",
+    ".ogm",
+    ".ogv",
+    ".rm",
+    ".rmvb",
+    ".ts",
+    ".vob",
+    ".webm",
+    ".wmv",
 }
 TEXT_SUBTITLE_EXTENSIONS = {".ass", ".srt", ".ssa", ".vtt"}
 TEXT_CODECS = {
-    "ass", "dvb_teletext", "eia_608", "eia_708", "hdmv_text_subtitle",
-    "microdvd", "mov_text", "mpl2", "realtext", "sami", "srt", "ssa",
-    "subrip", "text", "ttml", "webvtt",
+    "ass",
+    "dvb_teletext",
+    "eia_608",
+    "eia_708",
+    "hdmv_text_subtitle",
+    "microdvd",
+    "mov_text",
+    "mpl2",
+    "realtext",
+    "sami",
+    "srt",
+    "ssa",
+    "subrip",
+    "text",
+    "ttml",
+    "webvtt",
 }
 ENGLISH_TAGS = {"en", "eng", "english"}
 FIELDNAMES = [
-    "video", "status", "forced_source", "forced_track", "forced_codec",
-    "forced_title", "forced_default", "forced_cues", "forced_first_seconds",
-    "forced_last_seconds", "full_source", "full_track", "full_codec",
-    "full_title", "full_default", "full_sdh", "full_cues",
-    "full_first_seconds", "full_last_seconds", "full_span_percent",
-    "full_to_forced_ratio", "reason", "error",
+    "video",
+    "status",
+    "forced_source",
+    "forced_track",
+    "forced_codec",
+    "forced_title",
+    "forced_default",
+    "forced_cues",
+    "forced_first_seconds",
+    "forced_last_seconds",
+    "full_source",
+    "full_track",
+    "full_codec",
+    "full_title",
+    "full_default",
+    "full_sdh",
+    "full_cues",
+    "full_first_seconds",
+    "full_last_seconds",
+    "full_span_percent",
+    "full_to_forced_ratio",
+    "reason",
+    "error",
 ]
 
 
@@ -98,13 +145,22 @@ def is_sdh_stream(stream: dict) -> bool:
 def probe_video(path: Path) -> tuple[float | None, list[dict]]:
     result = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-select_streams", "s",
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "s",
             "-show_entries",
             "format=duration:stream=index,codec_name:stream_tags=language,title:"
             "stream_disposition=default,forced,hearing_impaired",
-            "-of", "json", str(path),
+            "-of",
+            "json",
+            str(path),
         ],
-        text=True, capture_output=True, check=True, timeout=120,
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=120,
     )
     payload = json.loads(result.stdout)
     duration_text = (payload.get("format") or {}).get("duration")
@@ -119,12 +175,20 @@ def packet_metrics(track: Track) -> None:
     else:
         command += ["-select_streams", "s:0"]
     command += [
-        "-show_packets", "-show_entries", "packet=pts_time,dts_time,duration_time",
-        "-of", "json", str(track.path),
+        "-show_packets",
+        "-show_entries",
+        "packet=pts_time,dts_time,duration_time",
+        "-of",
+        "json",
+        str(track.path),
     ]
     try:
         result = subprocess.run(
-            command, text=True, capture_output=True, check=True, timeout=300,
+            command,
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=300,
         )
         packets = json.loads(result.stdout).get("packets", [])
         starts: list[float] = []
@@ -146,7 +210,7 @@ def packet_metrics(track: Track) -> None:
 
 
 def sidecar_language_tokens(video: Path, sidecar: Path) -> set[str]:
-    suffix = sidecar.name[len(video.stem): -len(sidecar.suffix)]
+    suffix = sidecar.name[len(video.stem) : -len(sidecar.suffix)]
     return words(suffix)
 
 
@@ -161,12 +225,18 @@ def same_stem_sidecars(video: Path) -> list[Track]:
         tokens = sidecar_language_tokens(video, sidecar)
         if not tokens & ENGLISH_TAGS:
             continue
-        found.append(Track(
-            source="sidecar", locator=sidecar.name,
-            codec=sidecar.suffix.lower().lstrip("."), title=sidecar.name,
-            default=False, forced="forced" in tokens,
-            sdh=bool(tokens & {"sdh", "cc", "hi"}), path=sidecar,
-        ))
+        found.append(
+            Track(
+                source="sidecar",
+                locator=sidecar.name,
+                codec=sidecar.suffix.lower().lstrip("."),
+                title=sidecar.name,
+                default=False,
+                forced="forced" in tokens,
+                sdh=bool(tokens & {"sdh", "cc", "hi"}),
+                path=sidecar,
+            )
+        )
     return found
 
 
@@ -177,12 +247,19 @@ def embedded_tracks(video: Path, streams: list[dict]) -> list[Track]:
         if codec not in TEXT_CODECS or not is_english_stream(stream):
             continue
         index = int(stream["index"])
-        tracks.append(Track(
-            source="embedded", locator=str(index), codec=codec,
-            title=tag(stream, "title"), default=disposition(stream, "default"),
-            forced=is_forced_stream(stream), sdh=is_sdh_stream(stream),
-            path=video, stream_index=index,
-        ))
+        tracks.append(
+            Track(
+                source="embedded",
+                locator=str(index),
+                codec=codec,
+                title=tag(stream, "title"),
+                default=disposition(stream, "default"),
+                forced=is_forced_stream(stream),
+                sdh=is_sdh_stream(stream),
+                path=video,
+                stream_index=index,
+            )
+        )
     return tracks
 
 
@@ -209,7 +286,9 @@ def command_error(error: BaseException) -> str:
     return str(error)
 
 
-def classify(forced: Track, full: Track, video_duration: float | None) -> tuple[str, str, float | None, float | None]:
+def classify(
+    forced: Track, full: Track, video_duration: float | None
+) -> tuple[str, str, float | None, float | None]:
     if forced.error or full.error or forced.cues is None or full.cues is None:
         return "METRIC_ERROR", "Could not read cue/timestamp metrics", None, None
     ratio = float("inf") if forced.cues == 0 else full.cues / forced.cues
@@ -220,26 +299,37 @@ def classify(forced: Track, full: Track, video_duration: float | None) -> tuple[
         return (
             "SAFE_REDUNDANT_FORCED",
             "Strong non-forced full-dialogue candidate: >=100 cues, >=5x cue ratio, >=50% timeline span",
-            ratio, span_percent,
+            ratio,
+            span_percent,
         )
     if full.cues >= 50 and ratio >= 3.0 and span_percent is not None and span_percent >= 35.0:
         return (
             "PROBABLE_REDUNDANT_FORCED",
             "Likely redundant, but below conservative automatic-safety thresholds",
-            ratio, span_percent,
+            ratio,
+            span_percent,
         )
     return (
         "REVIEW_FORCED_WITH_NONFORCED",
         "A non-forced English text track exists, but coverage evidence is not decisive",
-        ratio, span_percent,
+        ratio,
+        span_percent,
     )
 
 
-def row(video: Path, status: str, forced: Track | None = None, full: Track | None = None,
-        ratio: float | None = None, span_percent: float | None = None,
-        reason: str = "", error: str = "") -> dict[str, object]:
+def row(
+    video: Path,
+    status: str,
+    forced: Track | None = None,
+    full: Track | None = None,
+    ratio: float | None = None,
+    span_percent: float | None = None,
+    reason: str = "",
+    error: str = "",
+) -> dict[str, object]:
     return {
-        "video": str(video), "status": status,
+        "video": str(video),
+        "status": status,
         "forced_source": forced.source if forced else "",
         "forced_track": forced.locator if forced else "",
         "forced_codec": forced.codec if forced else "",
@@ -259,7 +349,8 @@ def row(video: Path, status: str, forced: Track | None = None, full: Track | Non
         "full_last_seconds": metric(full.last) if full else "",
         "full_span_percent": metric(span_percent),
         "full_to_forced_ratio": "inf" if ratio == float("inf") else metric(ratio),
-        "reason": reason, "error": error,
+        "reason": reason,
+        "error": error,
     }
 
 
@@ -271,7 +362,9 @@ def main() -> int:
     parser.add_argument("--report", type=Path, required=True, help="CSV report path")
     parser.add_argument("--limit", type=int, default=0, help="Inspect at most N videos")
     parser.add_argument(
-        "--progress-every", type=int, default=100,
+        "--progress-every",
+        type=int,
+        default=100,
         help="Print progress every N videos (default: 100)",
     )
     args = parser.parse_args()
@@ -320,17 +413,26 @@ def main() -> int:
                 status = "KEEP_FORCED_ONLY"
                 for forced in forced_tracks:
                     packet_metrics(forced)
-                    writer.writerow(row(
-                        video, status, forced=forced,
-                        reason="No English non-forced text track exists; do not remove",
-                        error=forced.error,
-                    ))
+                    writer.writerow(
+                        row(
+                            video,
+                            status,
+                            forced=forced,
+                            reason="No English non-forced text track exists; do not remove",
+                            error=forced.error,
+                        )
+                    )
                     counts[status] += 1
-                    print(f"  {forced.source} {forced.locator}: KEEP (no non-forced English text alternative)", flush=True)
+                    print(
+                        f"  {forced.source} {forced.locator}: KEEP (no non-forced English text alternative)",
+                        flush=True,
+                    )
             elif forced_tracks:
                 for track in forced_tracks + full_tracks:
                     packet_metrics(track)
-                usable_full = [track for track in full_tracks if track.cues is not None and not track.error]
+                usable_full = [
+                    track for track in full_tracks if track.cues is not None and not track.error
+                ]
                 best_full = max(
                     usable_full,
                     key=lambda track: (track.cues or 0, (track.last or 0) - (track.first or 0)),
@@ -339,20 +441,34 @@ def main() -> int:
                 if best_full is None:
                     status = "METRIC_ERROR"
                     for forced in forced_tracks:
-                        writer.writerow(row(
-                            video, status, forced=forced,
-                            reason="Non-forced English track exists but its metrics could not be read",
-                            error="; ".join(track.error for track in full_tracks if track.error),
-                        ))
+                        writer.writerow(
+                            row(
+                                video,
+                                status,
+                                forced=forced,
+                                reason="Non-forced English track exists but its metrics could not be read",
+                                error="; ".join(
+                                    track.error for track in full_tracks if track.error
+                                ),
+                            )
+                        )
                         counts[status] += 1
                 else:
                     for forced in forced_tracks:
                         status, reason, ratio, span_percent = classify(forced, best_full, duration)
                         error = forced.error or best_full.error
-                        writer.writerow(row(
-                            video, status, forced, best_full, ratio, span_percent,
-                            reason, error,
-                        ))
+                        writer.writerow(
+                            row(
+                                video,
+                                status,
+                                forced,
+                                best_full,
+                                ratio,
+                                span_percent,
+                                reason,
+                                error,
+                            )
+                        )
                         counts[status] += 1
                         ratio_text = "inf" if ratio == float("inf") else metric(ratio)
                         print(
@@ -369,8 +485,11 @@ def main() -> int:
     print(f"  Videos inspected: {inspected}")
     print(f"  Videos with English forced text: {candidate_files}")
     for status in (
-        "SAFE_REDUNDANT_FORCED", "PROBABLE_REDUNDANT_FORCED",
-        "REVIEW_FORCED_WITH_NONFORCED", "KEEP_FORCED_ONLY", "METRIC_ERROR",
+        "SAFE_REDUNDANT_FORCED",
+        "PROBABLE_REDUNDANT_FORCED",
+        "REVIEW_FORCED_WITH_NONFORCED",
+        "KEEP_FORCED_ONLY",
+        "METRIC_ERROR",
         "PROBE_ERROR",
     ):
         print(f"  {status}: {counts[status]}")
