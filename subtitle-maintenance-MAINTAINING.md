@@ -2,6 +2,21 @@
 
 ## Active architecture
 
+`drift.py` implements opt-in global affine timing correction, not piecewise
+alignment. Fit cue/phrase midpoints using a robust median of separated-pair
+slopes, then a median intercept. Exclude anchor phrases overlapping the five
+independent sample windows (5/15/50/85/95 percent). Require 100 anchors, 65% span,
+scale 0.95–1.05 (at least 0.001 from unity), intercept within 60s, median residual
+<=0.5s and p90 <=1.5s, plus ten anchors and median signed residual <=0.75s per
+fifth. These are proposal gates only: unchanged full_check and all five sample
+checks authorize the candidate. No second shift is permitted. Revalidate the
+serialized output against the same five samples with fitting disabled. Skip
+combined SxxExx-Eyy files; do not use drift to bypass a passed-full/failed-sample
+result. Fit details and rejection evidence belong in per-candidate reports.
+Tests cover synthetic scale recovery, sparse/extreme/piecewise rejection,
+combined-episode exclusion, option isolation, text preservation and render gates.
+Real-media preview review remains required before broad apply of this trial.
+
 `subtitle-maintain.py` is the public entry point; `subtitle_maintenance/cli.py`
 owns argument validation, run locking, state and reports. `workflow.py` routes
 normal repair; `media.py` owns language/format classification; `subtitles.py`

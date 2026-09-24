@@ -7,6 +7,33 @@ no speech recognition or provider downloads.
 
 ## Commands
 
+### Verified drift correction (opt-in trial)
+
+`--allow-drift-correction` can repair a consistent playback-speed mismatch in an
+existing sidecar or provider candidate. It fits one global scale plus offset,
+not scene-by-scene edits. Preview remains the default; add `--apply` only after
+review. No video/audio streams are changed. Original sidecar backups and receipts
+remain available on apply. Combined episode filenames such as S03E08-E09 are
+excluded from drift fitting. Wrong cuts, sparse evidence and inconsistent drift
+remain unresolved; automated verification is not a guarantee of correctness.
+
+The trial requires at least 100 matched cues outside five held-out sample regions,
+a scale within 0.95–1.05, an intercept within 60 seconds, and tight overall/regional
+fit residuals. Corrected timestamps must then pass the unchanged full-dialogue
+gates and five independently transcribed samples. The staged SRT is checked again
+without further shifting or fitting. This may need two additional audio samples
+per episode; existing downloads/full transcripts are reused where compatible.
+The option is included in the policy cache key so earlier unresolved results can
+be reconsidered. Reports retain fitted scale, offset and rejection evidence.
+
+```sh
+~/scripts/subtitle-maintain.py '/Volumes/Media/Plex/TV/Will & Grace' \
+  --map-episode-titles \
+  --assume-single-untagged-english \
+  --allow-drift-correction \
+  --max-downloads 500 --max-candidates 10
+```
+
 ### Alternate episode numbering (opt-in)
 
 `--map-episode-titles` searches BOTH library numbering and TVmaze's alternate numbering
@@ -135,8 +162,9 @@ is installed, and no Bazarr/Subarr/FileFlows configuration is changed.
   plus another video size for the retained backup. Existing sidecars stay.
 - English sidecars: dialogue/display-interval verification across ten timeline
   bins and three independent samples. Verified unchanged subtitles stay as-is.
-  Uniform shifts up to 60 seconds may be staged and reverified. Wrong cuts,
-  meaningful drift, sparse dialogue and uncertain results are not forced to fit.
+  Uniform shifts up to 60 seconds may be staged and reverified. Global drift
+  correction requires the explicit trial option above. Wrong cuts, inconsistent
+  drift, sparse dialogue and uncertain results are not forced to fit.
 - Missing/unverified sidecars: identify from read-only Bazarr metadata or NFO,
   download full English candidates, then verify before installation. No matches
   means UNRESOLVED, not fabricated success. Movie IDs and TV season/episode IDs

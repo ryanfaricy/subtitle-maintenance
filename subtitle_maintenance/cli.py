@@ -20,6 +20,7 @@ def selection_lines(data):
     lines=[f"Selected: {selected['provider']} — {selected.get('release') or '(unnamed release)'} (file ID {selected['file_id']})"]
     if selected.get('url'):lines.append('Source: '+selected['url'])
     lines.append('Timing: '+(f'{offset:+.3f}s shift (positive = later)' if offset else 'unchanged'))
+    if data.get('selected_scale',1)!=1:lines[-1]=f"Timing: scale {data['selected_scale']:.6f}, offset {offset:+.3f}s"
     lines.append('Destination: '+data['destination'])
     return lines
 
@@ -42,6 +43,7 @@ def main():
     p.add_argument('--tag-missing-audio-english',action='store_true',help='Separate MKV metadata-only mode; single untagged audio only; preview unless --apply')
     p.add_argument('--max-downloads',type=int,help='Maximum new provider downloads this run (default config: 20); cached files do not count')
     p.add_argument('--max-candidates',type=int,help='Maximum unique candidates attempted per video (default config: 3)')
+    p.add_argument('--allow-drift-correction',action='store_true',help='Trial global timing scale fit with independent verification; preview unless --apply')
     p.add_argument('--map-episode-titles',action='store_true',help='Opt-in TVmaze alternate numbering by unique episode title; library unchanged')
     p.add_argument('--imdb',help='Explicit tt... movie or series ID; one video only')
     p.add_argument('--season',type=int)
@@ -61,6 +63,7 @@ def main():
     config['cache_only']=a.cache_only
     config['assume_single_untagged_english']=a.assume_single_untagged_english
     config['map_episode_titles']=a.map_episode_titles
+    config['allow_drift_correction']=a.allow_drift_correction
     if a.max_downloads is not None:config['max_downloads']=a.max_downloads
     if a.max_candidates is not None:config['max_candidates']=a.max_candidates
     a.state_dir=a.state_dir.expanduser().resolve();a.state_dir.mkdir(parents=True,exist_ok=True)

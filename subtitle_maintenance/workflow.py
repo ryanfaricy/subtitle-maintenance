@@ -8,16 +8,33 @@ from . import media,native,subtitles
 from .common import digest,fingerprint,install,run
 from .providers import identity,DownloadBudgetReached
 
-def verify(video,candidate,info,config,state):
+def verify(video,candidate,info,config,state,drift_render=False):
     cues=subtitles.read(candidate)
     full=native.words(native.transcript(video,info,None,None,config,state))
-    def samples():
-        for fraction in (.15,.5,.85):
+    def samples(fractions=(.15,.5,.85)):
+        for fraction in fractions:
             start=round(info['duration']*fraction)
             if start<15 or start+55>info['duration']:raise ValueError('Video too short for independent verification')
             data=native.transcript(video,info,start-15,70,config,state)
             yield start,native.words(data,start-15)
-    return subtitles.validate(cues,full,info['duration'],samples,config.get('max_shift',60))
+    if drift_render:
+        from . import drift
+        return subtitles.validate(cues,full,info['duration'],lambda:samples(drift.SAMPLES),0,5)
+    check=subtitles.validate(cues,full,info['duration'],samples,config.get('max_shift',60))
+    if check['passed'] or not config.get('allow_drift_correction') or check.get('full',{}).get('passed'):return check
+    from . import drift
+    if drift.combined_episode(video.stem):
+        check['drift_rejection']='Combined episode excluded';return check
+    try:
+        fitted=drift.fit(cues,full,info['duration'])
+        corrected=[dict(c,start=c['start']*fitted['scale']+fitted['offset'],end=c['end']*fitted['scale']+fitted['offset']) for c in cues]
+        verified=subtitles.validate(corrected,full,info['duration'],lambda:samples(drift.SAMPLES),0,5)
+        if not verified['passed'] or verified['offset']!=0:
+            check.update(drift_rejection='Corrected candidate failed unchanged verification gates',drift_fit=fitted,drift_verification=verified)
+            return check
+        return dict(verified,offset=fitted['offset'],scale=fitted['scale'],drift_fit=fitted)
+    except ValueError as e:
+        check['drift_rejection']=str(e);return check
 
 def prepare(video,source,info,config,state,folder):
     candidate=source
@@ -26,10 +43,11 @@ def prepare(video,source,info,config,state,folder):
         run(['ffmpeg','-nostdin','-v','error','-i',source,'-map','0:0','-c:s','srt','-y',candidate])
     check=verify(video,candidate,info,config,state)
     if not check['passed']:return None,check
-    if check['offset']:
+    if check['offset'] or check.get('scale',1)!=1:
         corrected=folder/(digest(candidate)+'.corrected.srt')
-        subtitles.shifted(candidate,corrected,check['offset'])
-        rendered=verify(video,corrected,info,config,state)
+        subtitles.shifted(candidate,corrected,check['offset'],check.get('scale',1))
+        rendered=verify(video,corrected,info,dict(config,allow_drift_correction=False),state,
+                        drift_render=check.get('scale',1)!=1)
         if not rendered['passed'] or rendered['offset']!=0:raise ValueError('Rendered correction failed revalidation')
         check['rendered_verification']=rendered;candidate=corrected
     return candidate,check
@@ -97,13 +115,13 @@ def process(video,args,config,state,provider):
             candidate,check=prepare(video,source,info,config,state,folder)
             record['attempts'].append(dict(source=str(source),check=check))
             if candidate:
-                if check['offset']==0:return dict(record,status='VERIFIED',subtitle=str(source),installed_sha256=digest(source))
+                if check['offset']==0 and check.get('scale',1)==1:return dict(record,status='VERIFIED',subtitle=str(source),installed_sha256=digest(source))
                 if source.suffix.lower()!='.srt':
                     return dict(record,status='REVIEW_FORMAT',detail='Verified corrected SRT staged; preserve original styled sidecar',candidate=str(candidate))
                 if args.apply:
                     receipt=install(candidate,source,state/'backups',originals[str(source)],video,fp)
                     return dict(record,status='RETIMED',receipt=receipt,subtitle=str(source),installed_sha256=digest(source))
-                return dict(record,status='WOULD_RETIME',candidate=str(candidate),offset=check['offset'])
+                return dict(record,status='WOULD_RETIME',candidate=str(candidate),offset=check['offset'],scale=check.get('scale',1),detail=f"Timing scale {check.get('scale',1):.6f}, offset {check['offset']:+.3f}s")
         except Exception as e:record['attempts'].append(dict(source=str(source),error=str(e)))
     if args.no_download:return dict(record,status='REVIEW',detail='No verified sidecar; provider search disabled')
     if unknown:return dict(record,status='REVIEW_UNTAGGED_SIDECAR',detail='Unlabelled sidecar present; language is not assumed')
@@ -145,7 +163,7 @@ def process(video,args,config,state,provider):
             # a locally shifted file whose filename no longer identifies its source.
             record.update(candidate=str(candidate),candidate_sha256=digest(candidate),
                           selected_provider=dict(entry,provider='OpenSubtitles'),
-                          selected_offset_seconds=check['offset'],destination=str(target))
+                          selected_offset_seconds=check['offset'],selected_scale=check.get('scale',1),destination=str(target))
             if args.apply:
                 receipt=install(candidate,target,state/'backups',expected,video,fp)
                 return dict(record,status='DOWNLOADED_VERIFIED',receipt=receipt,subtitle=str(target),installed_sha256=digest(target))
