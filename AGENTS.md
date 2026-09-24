@@ -33,5 +33,16 @@ validated change with a local Git commit using Conventional Commit style, e.g.
   logs, caches, generated reports and runtime artifacts from new commits.
 - If safe staging or validation is blocked, explain it rather than silently
   skipping the commit or claiming the work was committed.
-- Commits are local only. Do not push, amend unrelated commits or rewrite history
-  unless separately requested. Preserve this policy when regenerating this file.
+- After each coherent, validated commit, push the current branch to
+  `https://github.com/ryanfaricy/subtitle-maintenance.git`. This is the user's
+  standing authorization; no separate push request is needed each time.
+- Verify the remote URL before pushing; use a normal fast-forward push. Never
+  force-push, amend unrelated commits, rewrite history, or resolve remote
+  divergence destructively. Stop and report authentication or branch conflicts.
+- Before the first push, review ALL outgoing history, not just the latest diff,
+  for credentials, private configuration, reports and archived artifacts. Legacy
+  tracked files (including eastenders-fix.py and old/) need particular care.
+  Do not publish until that review is complete; do not print discovered secrets.
+  Later pushes must check all newly outgoing commits for the same risks.
+- Report the commit hash and push result honestly. If blocked, retain the local
+  commit and explain why. Preserve this policy when regenerating this file.
