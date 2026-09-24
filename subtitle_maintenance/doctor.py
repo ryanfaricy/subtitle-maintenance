@@ -60,7 +60,7 @@ def checks(config):
     results.append(
         (
             "INFO",
-            "Native MLX transcription requires Apple Silicon; service-based transcription depends on your configured service.",
+            "Full dialogue repair requires Apple Silicon MLX. The separate Whisper backfill script supports ASR services.",
         )
     )
     return results

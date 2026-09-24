@@ -38,7 +38,8 @@ def selection_lines(data):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Conservative English subtitle maintenance. Preview by default."
+        description="Conservative English subtitle maintenance. Preview by default.",
+        epilog="First run: subtitle-maintain init; check tools: subtitle-maintain doctor [--install]. Use ./init or ./doctor for folders with those names.",
     )
     parser.add_argument("paths", nargs="*", type=Path)
     parser.add_argument(
@@ -51,6 +52,11 @@ def build_parser():
         "--doctor",
         action="store_true",
         help="Check local setup without processing media or contacting services",
+    )
+    parser.add_argument(
+        "--install",
+        action="store_true",
+        help="With --doctor only: propose and confirm core tool installation",
     )
     parser.add_argument("--apply", action="store_true")
     parser.add_argument(
@@ -127,7 +133,15 @@ def main(argv=None):
     if not arguments:
         parser.print_help()
         return 0
+    if arguments[0] == "init":
+        from .setup import initialize
+
+        return initialize(arguments[1:])
+    if arguments[0] == "doctor":
+        arguments = ["--doctor", *arguments[1:]]
     args = parser.parse_args(arguments)
+    if args.install and not args.doctor:
+        parser.error("--install requires doctor or --doctor")
     if args.limit < 0:
         parser.error("--limit must be zero or greater")
     if args.doctor and (
@@ -170,6 +184,10 @@ def main(argv=None):
     if args.doctor:
         from .doctor import diagnose
 
+        if args.install:
+            from .dependencies import install_missing
+
+            return install_missing(config)
         return diagnose(config)
     from .common import configure_tools
 

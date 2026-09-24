@@ -17,22 +17,26 @@ for verification behavior and apply/restore commands.
    requires a compatible Apple Silicon runtime and model; configuring paths
    does not make MLX cross-platform. Provider access needs `requests` and
    `PyYAML` in the configured Python, or the documented Bazarr bridge.
-3. Copy `subtitle-maintenance.example.json` to `subtitle-maintenance.json`.
-   Set `media_root`, `python`, and `model`. Configure only the integrations you use.
+3. Create a virtual environment and install the project as shown below.
+   Then run `subtitle-maintain init` for guided settings, or copy
+   `subtitle-maintenance.example.json` to `subtitle-maintenance.json` and edit it.
 4. Install the command in a virtual environment and check setup:
 
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-subtitle-maintain --doctor
+subtitle-maintain init
+subtitle-maintain doctor
 ```
 
 Use `'.[providers]'` instead of `.` for standalone provider dependencies, or
 `'.[mlx]'` for optional Apple Silicon transcription dependencies. The main CLI
 and metadata logic use the Python standard library; external media tools are
-installed separately. Linux supports the core/service-based paths; Windows is
-not currently supported. `doctor` checks local availability, not real provider,
+installed separately. Linux supports inventory/audits and other non-MLX utilities. Full dialogue repair
+currently requires native Apple Silicon MLX even if `service_url` is configured;
+that URL checks GPU availability, not remote transcription. The separate
+`whisper-subtitles.py` uses an ASR service. Windows is not currently supported. `doctor` checks local availability, not real provider,
 OCR or model interoperability.
 
 5. Run a read-only inventory:
@@ -46,6 +50,56 @@ and transcribe into the state folder. Use `--scan-only` for the initial inventor
 The local config is ignored by Git. Never put credentials in the example or local
 settings; use the existing environment/owner-only secrets mechanism described in
 [SECURITY.md](SECURITY.md).
+
+## Guided setup
+
+```sh
+subtitle-maintain init
+subtitle-maintain doctor --install
+subtitle-maintain --scan-only
+```
+
+`init` asks for an existing media folder and offers audit-only setup (the default)
+or native MLX setup on Apple Silicon. Native setup asks for an existing model
+folder and Python runtime; it does not download a model or verify its compatibility.
+It displays the resulting settings and asks before creating a private `0600` file.
+
+Config selection matches the normal command: `--config`, the config environment
+variable, an existing repo-local config, or the user config directory. Existing
+configs are validated and left untouched, including on repeated runs. Malformed
+files are reported without replacing them. To create an alternative:
+
+```sh
+subtitle-maintain init --config ~/.config/subtitle-maintenance/other.json
+subtitle-maintain doctor --config ~/.config/subtitle-maintenance/other.json
+```
+
+`doctor --install` installs only missing **ffmpeg** and **MKVToolNix** packages:
+
+- macOS: uses Homebrew already installed on `PATH`. It does not install Homebrew.
+- Debian/Ubuntu: uses `apt-get update` followed by `apt-get install`, with `sudo`
+  when required. The exact commands are displayed before confirmation; administrator
+  credentials are entered directly into the terminal, never stored by this tool.
+- Other platforms: supplies manual guidance without running an installer.
+
+Custom tool paths that are missing must be corrected first; the installer will
+not silently replace those settings. Tools are rechecked after installation. A
+failed package operation is not retried automatically or claimed to be rolled back.
+Core package dependencies may also be installed by the system package manager.
+
+Both commands require a terminal for interactive changes; EOF or the default
+confirmation declines the action. Ordinary `doctor` and the existing `--doctor`
+remain read-only. `--doctor --install` is also supported. Setup does not read
+credentials, create schedules, modify media, or install optional OCR/Python/model
+components. Install optional Python extras only inside a virtual environment as
+shown above. Scripted setup can copy/edit the example config instead.
+
+The first argument `init` or `doctor` selects a setup command. Use `./init` or
+`./doctor` if a media folder has one of those names.
+
+Package references: [Homebrew ffmpeg](https://formulae.brew.sh/formula/ffmpeg),
+[Homebrew MKVToolNix](https://formulae.brew.sh/formula/mkvtoolnix), and
+[Debian MKVToolNix](https://packages.debian.org/stable/mkvtoolnix).
 
 ## Shared configuration
 

@@ -23,6 +23,7 @@ flowchart TD
 | `cli.py` | Argument validation, mode selection, locking, progress and reports |
 | `script_config.py`, `config_schema.py` | Config discovery, path resolution, key/type/range validation |
 | `doctor.py` | Local read-only dependency checks; no tool execution or network |
+| `setup.py`, `dependencies.py` | Confirmed new-config creation and explicit, allowlisted package-manager plans |
 | `media.py` | File inventory, subtitle classification, audio selection |
 | `workflow.py` | Coordinate evidence and processing, without weakening verification |
 | `providers.py`, `bazarr_bridge.py` | Provider process boundary, quotas, authentication and transport recovery |
@@ -53,3 +54,6 @@ The supported general entry point handles English subtitle maintenance. The
 EastEnders and QI scripts encode show-specific assumptions and remain specialist
 utilities. Native MLX inference requires Apple Silicon. CI tests core behavior on
 Linux and macOS without testing a real model, OCR engine, or provider account.
+Main dialogue repair currently invokes the native MLX worker; its service URL
+only checks GPU availability. Service-based backfill belongs to the separate
+Whisper script. Setup offers audit-only operation on Linux.

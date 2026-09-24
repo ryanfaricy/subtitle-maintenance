@@ -17,14 +17,22 @@ def user_config_path():
     )
 
 
+def config_path(filename=None):
+    """Use the same destination for discovery and init; existing repo config wins."""
+    selected = filename or os.environ.get(CONFIG_ENV)
+    if selected:
+        return Path(selected).expanduser()
+    candidate = REPO_ROOT / "subtitle-maintenance.json"
+    if candidate.exists() or candidate.is_symlink():
+        return candidate
+    return user_config_path()
+
+
 def load_config(filename=None):
     """Explicit paths must exist; an absent default config means portable defaults."""
-    selected = filename or os.environ.get(CONFIG_ENV)
-    path = Path(selected).expanduser() if selected else REPO_ROOT / "subtitle-maintenance.json"
-    if not path.exists() and not selected:
-        path = user_config_path()
-        if not path.exists():
-            return {}
+    path = config_path(filename)
+    if not path.exists() and not path.is_symlink() and not (filename or os.environ.get(CONFIG_ENV)):
+        return {}
     try:
         config = json.loads(path.read_text())
     except (OSError, ValueError) as exc:

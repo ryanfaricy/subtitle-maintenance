@@ -39,3 +39,5 @@ jobs:
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/wheel-test/bin/subtitle-maintain" --help
           "$RUNNER_TEMP/wheel-test/bin/subtitle-maintain"
+          "$RUNNER_TEMP/wheel-test/bin/subtitle-maintain" init --help
+          "$RUNNER_TEMP/wheel-test/bin/subtitle-maintain" doctor --help

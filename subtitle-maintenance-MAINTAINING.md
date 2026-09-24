@@ -1,5 +1,15 @@
 # Maintenance and migration map
 
+## Guided setup commands
+
+`init` creates a validated private config only after confirmation, preserving
+existing files. `doctor --install` proposes allowlisted Homebrew or Debian/Ubuntu
+apt commands, requires interactive confirmation, and verifies installed tools.
+Neither config setup nor ordinary doctor processes media or enables schedules.
+Tests mock installers and use temporary config files; never invoke a real
+package-manager installation merely for testing.
+
+
 ## Version 0.2 safety changes
 
 Bare entry points now show help. Whisper generation and Subarr backup require
